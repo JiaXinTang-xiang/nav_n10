@@ -1,0 +1,59 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+  - Class: rviz_common/View
+    Name: View
+Visualization Manager:
+  Displays:
+    - Class: rviz_common/Grid
+      Name: Grid
+    - Class: rviz_default_plugins/Map
+      Name: Map
+      Topic:
+        Depth: 1
+        Durability Policy: Transient Local
+        Reliability Policy: Reliable
+        Value: /map
+      Update Topic:
+        Value: /map_updates
+    - Class: rviz_default_plugins/TF
+      Name: TF
+    - Class: rviz_default_plugins/RobotModel
+      Name: RobotModel
+      Description Topic:
+        Value: /robot_description
+    - Class: rviz_default_plugins/LaserScan
+      Name: LaserScan
+      Topic:
+        Value: /scan
+      Size (m): 0.05
+      Style: Points
+    - Class: rviz_default_plugins/Path
+      Name: Global Plan
+      Topic:
+        Value: /plan
+      Color: 0; 255; 0
+    - Class: rviz_default_plugins/Path
+      Name: Local Plan
+      Topic:
+        Value: /local_plan
+      Color: 255; 0; 0
+    - Class: rviz_common/Group
+      Name: Costmaps
+      Displays:
+        - Class: rviz_default_plugins/Map
+          Name: Global Costmap
+          Topic:
+            Value: /global_costmap/costmap_raw
+          Color Scheme: costmap
+        - Class: rviz_default_plugins/Map
+          Name: Local Costmap
+          Topic:
+            Value: /local_costmap/costmap_raw
+          Color Scheme: costmap
+  Enabled: true
+  Global Options:
+    Fixed Frame: map
+  Tools:
+    - Class: rviz_default_plugins/SetInitialPose
+    - Class: rviz_default_plugins/SetGoal

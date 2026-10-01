@@ -1,0 +1,60 @@
+# colcon 编译产物
+build/
+install/
+log/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+*.egg
+
+# IDE
+.vscode/
+.idea/
+
+# 系统
+.DS_Store
+Thumbs.db
+
+# 临时文件
+*.swp
+*.swo
+*~
+\#*\#
+
+# Keil MDK 编译产物
+*.o
+*.d
+*.crf
+*.axf
+*.hex
+*.dep
+*.lst
+*.uvguix.*
+*.scvd
+*.uvoptx
+
+# Keil 输出目录
+firmware_*/Objects/
+firmware_*/Listings/
+firmware_*/RTE/
+firmware_*/DebugConfig/
+
+
+# 所有的一般可执行文件
+/**/*.exe
+# KeilIDE编辑器忽略项
+/**/MDK-ARM/*
+# 不忽略Keil工程配置文件
+!/**/MDK-ARM/*.uvoptx
+!/**/MDK-ARM/*.uvprojx
+!/**/MDK-ARM/startup_*.s
+# armgcc-cmake工程忽略项
+/**/cmake-build-debug
+# VsCode编辑器忽略项
+/**/.vscode
+/**/workspace.code-workspace
+# Clion编辑器忽略项
+/**/.idea

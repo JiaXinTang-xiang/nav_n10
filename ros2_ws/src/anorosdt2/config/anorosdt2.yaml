@@ -1,0 +1,10 @@
+# anorosdt2 参数配置
+# ANO 飞控串口 IMU 数据桥接
+
+# 串口设置
+anoros_dt:
+  ros__parameters:
+    serial_port: "/dev/ttyUSB0"
+    serial_baud: 921600
+    pub_topic: "/imu/data"
+    frame_id: "imu_link"
