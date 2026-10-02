@@ -11,7 +11,6 @@ anoros_dt_node.py — ROS2 桥接节点
 import struct
 import math
 import sys
-import signal
 
 import rclpy
 from rclpy.node import Node
@@ -276,21 +275,14 @@ def main(args=None):
     rclpy.init(args=args)
     node = AnorosDTNode()
 
-    # 优雅退出
-    def shutdown(sig, frame):
-        node.destroy_node()
-        rclpy.shutdown()
-
-    signal.signal(signal.SIGINT, shutdown)
-    signal.signal(signal.SIGTERM, shutdown)
-
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
         pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == '__main__':
