@@ -1,0 +1,24 @@
+# 底盘 / 飞控 / 雷达 串口固定命名规则
+# 生成: 2026-10-02  平台: Jetson Nano (Linux 5.15-tegra)
+#
+# 背景: USB 串口的 /dev/ttyCH341USB* 编号会随拔插/上电顺序漂移(这次就从 0/1 漂到了 2/3),
+#       导致 ROS 节点指到失效的串口、/odom 和 /imu/data 收不到数据。
+#       用 udev 规则给它们固定一个永不变的名字, 一劳永逸。
+#
+# 原理:
+#   - CH340 芯片无唯一序列号, 只能按"USB 物理口"(KERNELS 里的 1-2.x)区分。
+#   - 雷达用的 CH343 有序列号, 按序列号固定最稳(换口也不怕)。
+#   - 三个设备现在都插在 Jetson 的同一个 4 口 USB2.0 Hub(1-2)上, 口位:
+#         1-2.2 -> 底盘   /   1-2.3 -> 雷达   /   1-2.4 -> 飞控
+#
+# ⚠️ 前提: 底盘和飞控这两个 CH340 必须一直插在"现在这两个口"上。
+#    如果换到别的 USB 口, 物理路径会变, 需要重新跑一次 `udevadm info -a -n /dev/ttyCH341USB*` 更新路径。
+
+# 底盘 STM32F407 (CH340)  -> 固定为 /dev/chassis
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="7523", KERNELS=="1-2.2", SYMLINK+="chassis"
+
+# 飞控 IMU (CH340)        -> 固定为 /dev/imu
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="7523", KERNELS=="1-2.4", SYMLINK+="imu"
+
+# LSN10 激光雷达 (CH343/cdc_acm) -> 固定为 /dev/lidar (按序列号)
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="55d4", ATTRS{serial}=="5A6D013507", SYMLINK+="lidar"
