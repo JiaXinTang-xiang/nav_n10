@@ -3,17 +3,12 @@
 #
 # 用法:  bash robot_bringup.sh
 # 串口固定名见 /etc/udev/rules.d/99-robot-serial.rules (chassis / imu / lidar)
-#
-# 多机: WiFi 组播被路由器挡，用 CycloneDDS 走单播 peers。
-#   依赖: sudo apt install -y ros-humble-rmw-cyclonedds
-#   配置: cyclonedds/cyclonedds-jetson.xml (peer 指向 PC 的 IP，IP 变了要改)
+# 多机: 手机热点组播正常，用默认 FastDDS 即可，无需额外配置。
 
 WS="${HOME}/Desktop/nav_n10"
 
 export ROS_DOMAIN_ID=0
 export ROS_LOCALHOST_ONLY=0
-export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-export CYCLONEDDS_URI="file://${WS}/cyclonedds/cyclonedds-jetson.xml"
 
 source /opt/ros/humble/setup.bash
 
@@ -24,8 +19,10 @@ pkill -9 -f lslidar_driver_node  2>/dev/null || true
 pkill -9 -f "fastdds discovery"  2>/dev/null || true
 sleep 1
 
-echo "=== [2/4] 重启 ROS daemon(带 CycloneDDS 环境) ==="
-ros2 daemon stop  >/dev/null 2>&1 || true
+echo "=== [2/4] 重启 ROS daemon ==="
+# 用 pkill 强杀，避免 RMW 切换时 ros2 daemon stop 卡住
+pkill -9 -f ros2-daemon 2>/dev/null || true
+sleep 1
 ros2 daemon start >/dev/null 2>&1 || true
 
 echo "=== [3/4] 检查串口固定名 ==="
