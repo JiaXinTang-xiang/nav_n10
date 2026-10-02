@@ -29,6 +29,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "bsp.h"
+#include "Chassis_task.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -102,6 +103,8 @@ int main(void)
   MX_UART4_Init();
   MX_USART6_UART_Init();
   MX_I2C2_Init();
+  MX_TIM1_Init();
+  MX_TIM2_Init();
   MX_TIM3_Init();
   MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
@@ -113,10 +116,11 @@ int main(void)
   Relay_Init();
   SPI_IMU_CS(1);
   delay_ms(100);
-  UART_Init(&huart2, UART_Vision_Call_Back, UART_BUFFER_SIZE);
+  UART_Init(&huart2, UART_Host_Call_Back, UART_BUFFER_SIZE);   /* USART2 = 底盘协议 (Jetson) */
   UART_Init(&huart4, UART_WireLess_Call_Back, UART_BUFFER_SIZE);
   RGB_Control(0,0,0);
   IMU_Ctrl_Init();
+  Chassis_Init();          /* 编码器(TIM1/TIM2 输入捕获) + 速度环 PID */
   init_finished = 1;
   
   
@@ -130,22 +134,47 @@ int main(void)
 	
 	  IMU_getYawPitchRoll(ypr);
 //	  debug_printf("\tangle:%.2f\t%.2f\t%.2f\r\n", ypr[0], ypr[1], ypr[2]);
-	  
-	  OLED_show_string(1, 0, (uint8_t*)"yaw  :");
-	  OLED_show_string(2, 0, (uint8_t*)"pitch:");
-	  OLED_show_string(3, 0, (uint8_t*)"roll :");
-	  OLED_printf(1, 7, "%.2f", ypr[0]);
-	  OLED_printf(2, 7, "%.2f", ypr[1]);
-	  OLED_printf(3, 7, "%.2f", ypr[2]);
-	  OLED_refresh_gram();
-	  
-		key = Key_GetNum();
-			switch (key) {
-			case USERKEY_SHORT:  RGB_Control(255,255,255);break;
-			case USERKEY_LONG:   RGB_Control(0,0,0); break;
-			default: break;
-		}
-			Load(-30,-20);
+
+	  /* ============ 底盘调试: 按 USERKEY 循环切换四个模式 ============
+	     模式 0  标定显示 : 手推车看计数/轮速/距离/里程计
+	     模式 1  开环基准 : Load(-20,-20) 那个 PWM, 看 act 是多少
+	     模式 2  速度环   : 两轮闭环跑 0.2 m/s, 看 act 跟不跟得住 tgt
+	     模式 3  编码器自检: 期望约 100,100
+	     切到 1/2 轮子会转(建议架空), 切走自动停车。
+	     ============================================================== */
+	  {
+		  static uint8_t mode = 0;
+
+		  if (Key_GetNum() == USERKEY_SHORT) {
+			  /* 离开任何会转的模式前, 先停车 */
+			  if ((mode == 1u) || (mode == 2u)) {
+				  Chassis_TestStop();
+			  }
+
+			  mode = (uint8_t)((mode + 1u) % 4u);
+
+			  if (mode == 1u) {
+				  Chassis_TestOpenLoopStart();   /* 开环 PWM=20 基准 */
+			  } else if (mode == 2u) {
+				  Chassis_TestSpeedStart();      /* 闭环 0.2 m/s */
+			  } else if (mode == 3u) {
+				  Chassis_SelfTest();            /* 编码器通路自检 */
+			  }
+		  }
+
+		  switch (mode) {
+		  case 1u:
+		  case 2u:
+			  Chassis_DebugDisplaySpeedTest();
+			  break;
+		  case 3u:
+			  Chassis_DebugDisplaySelfTest();
+			  break;
+		  default:
+			  Chassis_DebugDisplay();
+			  break;
+		  }
+	  }
 
     /* USER CODE END WHILE */
  

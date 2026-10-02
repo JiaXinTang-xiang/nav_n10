@@ -1,60 +1,91 @@
-# colcon 编译产物
-build/
-install/
-log/
+# =============================================================================
+# Build output
+# =============================================================================
+
+# ROS 2 / colcon
+**/build/
+**/install/
+**/log/
+
+# CMake / Ninja / Make
+**/cmake-build-*/
+**/CMakeFiles/
+**/CMakeCache.txt
+**/compile_commands.json
+**/build.ninja
+**/.ninja_deps
+**/.ninja_log
+
+# Keil MDK output directories
+**/Objects/
+**/Listings/
+**/RTE/
+**/DebugConfig/
+**/intermediateFiles/
+
+# This Keil target writes output to a directory named after the target.
+/Telemetry framework/MDK-ARM/Telemetry framework/
+
+# Compiler, linker, and firmware outputs
+*.o
+*.obj
+*.d
+*.dep
+*.crf
+*.axf
+*.elf
+*.hex
+*.bin
+*.map
+*.lst
+*.lnp
+*.m51
+*.plg
+*.tra
+*.build_log.htm
+
+# Keil generated user/session/debug files
+*.uvguix.*
+*.scvd
+*.dbgconf
+JLinkLog.txt
+
+# General executables and debug output
+*.exe
+*.out
+*.ilk
+*.pdb
+
+# =============================================================================
+# Language caches
+# =============================================================================
 
 # Python
 __pycache__/
-*.pyc
-*.pyo
-*.egg-info/
+*.py[cod]
 *.egg
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
 
-# IDE
+# =============================================================================
+# Editors, operating systems, and temporary files
+# =============================================================================
+
 .vscode/
 .idea/
+*.code-workspace
 
-# 系统
 .DS_Store
 Thumbs.db
+Desktop.ini
 
-# 临时文件
 *.swp
 *.swo
 *~
 \#*\#
+*.bak
 
-# Keil MDK 编译产物
-*.o
-*.d
-*.crf
-*.axf
-*.hex
-*.dep
-*.lst
-*.uvguix.*
-*.scvd
-*.uvoptx
-
-# Keil 输出目录
-firmware_*/Objects/
-firmware_*/Listings/
-firmware_*/RTE/
-firmware_*/DebugConfig/
-
-
-# 所有的一般可执行文件
-/**/*.exe
-# KeilIDE编辑器忽略项
-/**/MDK-ARM/*
-# 不忽略Keil工程配置文件
-!/**/MDK-ARM/*.uvoptx
-!/**/MDK-ARM/*.uvprojx
-!/**/MDK-ARM/startup_*.s
-# armgcc-cmake工程忽略项
-/**/cmake-build-debug
-# VsCode编辑器忽略项
-/**/.vscode
-/**/workspace.code-workspace
-# Clion编辑器忽略项
-/**/.idea
+# Keep source and Keil project configuration files tracked:
+# *.c, *.cpp, *.h, *.s, *.sct, Makefile, *.uvproj, *.uvprojx,
+# *.uvopt, *.uvoptx, *.ioc

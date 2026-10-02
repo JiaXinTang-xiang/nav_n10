@@ -27,7 +27,7 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "encoder.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
@@ -72,6 +72,11 @@ void DMA2_Stream6_IRQHandler(void);
 void DMA2_Stream7_IRQHandler(void);
 void USART6_IRQHandler(void);
 /* USER CODE BEGIN EFP */
+/* 这两个必须在这里声明: 本工程 .c 按 C++ 编译, 若没有声明, 定义出来的就是
+   C++ 修饰名 _Z18TIM1_CC_IRQHandlerv, 无法覆盖 startup 里的 [WEAK] 同名弱符号,
+   中断会静默跑到默认死循环里去。 */
+void TIM1_CC_IRQHandler(void);
+void TIM2_IRQHandler(void);
 
 /* USER CODE END EFP */
 

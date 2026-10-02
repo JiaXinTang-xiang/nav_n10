@@ -6,6 +6,7 @@
 #include "stm32f4xx_hal.h"
 #include "can.h"
 #include <string.h>
+#include <stdbool.h>
 
 /* Exported macros -----------------------------------------------------------*/
 

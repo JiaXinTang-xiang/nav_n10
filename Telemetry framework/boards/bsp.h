@@ -50,6 +50,8 @@ typedef uint8_t bool_t;
 #include "Xunji_task.h"
 #include "Timer_task.h"
 #include "communication_task.h"
+#include "Chassis_task.h"
+#include "Chassis_protocol.h"
 
 /* Algorithm（算法层） */
 #include "pid.h"

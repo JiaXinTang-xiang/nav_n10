@@ -1,4 +1,5 @@
 #include "Timer_task.h"
+#include <stdbool.h>
 
 /**
  * @brief  HAL 定时器溢出回调函数
@@ -34,16 +35,17 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 			Key_Tick();
 
 		}
-		if(count1 >= 50)	// 200hz任务（一般是视觉）
+		if(count1 >= 50)	// 200hz任务
 		{
 			count1=0;
-			
+			Chassis_Update();	// 编码器读取 + 速度环 + 里程计 (5ms 周期)
 	
 		}
 		if(count2 >= 200)		// 50hz任务
 		{
 			count2=0;
 			LED1_toggle();
+			Host_SendOdom();	// 每 20ms 发一帧 0xCC 里程计给上位机
 		}
     }
 }

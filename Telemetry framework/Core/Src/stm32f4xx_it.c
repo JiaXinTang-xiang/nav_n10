@@ -22,6 +22,7 @@
 #include "stm32f4xx_it.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "encoder.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -433,6 +434,29 @@ void USART6_IRQHandler(void)
   /* USER CODE BEGIN USART6_IRQn 1 */
 
   /* USER CODE END USART6_IRQn 1 */
+}
+
+/**
+  * @brief This function handles TIM1 capture compare interrupt.
+  * @note  左轮编码器 A 相 PE13 的双边沿输入捕获, 直接转发给编码器驱动,
+  *        不走 HAL_TIM_IRQHandler (编码器中断可达数 kHz, 省掉分支判断)
+  */
+void TIM1_CC_IRQHandler(void)
+{
+  /* USER CODE BEGIN TIM1_CC_IRQn 0 */
+  Encoder_CaptureIRQ(TIM1);
+  /* USER CODE END TIM1_CC_IRQn 0 */
+}
+
+/**
+  * @brief This function handles TIM2 global interrupt.
+  * @note  右轮编码器 A 相 PA2 的双边沿输入捕获
+  */
+void TIM2_IRQHandler(void)
+{
+  /* USER CODE BEGIN TIM2_IRQn 0 */
+  Encoder_CaptureIRQ(TIM2);
+  /* USER CODE END TIM2_IRQn 0 */
 }
 
 /* USER CODE BEGIN 1 */
