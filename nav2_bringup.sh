@@ -9,6 +9,8 @@ URDF='<?xml version="1.0"?><robot name="lsn10_robot"><link name="base_link"/><li
 
 export ROS_DOMAIN_ID=0
 export ROS_LOCALHOST_ONLY=0
+export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+export CYCLONEDDS_URI="file://${WS}/cyclonedds/cyclonedds-jetson.xml"
 source /opt/ros/humble/setup.bash
 source "${WS}/ros2_ws/install/setup.bash"
 
@@ -27,10 +29,9 @@ pkill -9 -f behavior_server 2>/dev/null
 pkill -9 -f bt_navigator 2>/dev/null
 pkill -9 -f velocity_smoother 2>/dev/null
 pkill -9 -f lifecycle_manager 2>/dev/null
-pkill -9 -f "ros2 run" 2>/dev/null
-pkill -9 -f ros2-daemon 2>/dev/null
 sleep 2
-ros2 daemon start >/dev/null 2>&1
+ros2 daemon stop >/dev/null 2>&1 || true
+ros2 daemon start >/dev/null 2>&1 || true
 
 echo "=== [2/4] 数据节点(底盘/雷达/URDF) ==="
 nohup ros2 run wheeltec_chassis chassis_bridge --ros-args \

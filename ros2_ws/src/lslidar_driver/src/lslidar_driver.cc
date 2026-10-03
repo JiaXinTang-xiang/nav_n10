@@ -495,6 +495,8 @@ namespace lslidar_driver
 
 	bool LslidarDriver::initialize()
 	{
+		time_ = get_clock()->now();
+		pre_time_ = time_;
 		if (!loadParameters())
 		{
 			RCLCPP_ERROR(this->get_logger(), "Cannot load all required ROS parameters...");
@@ -785,9 +787,9 @@ namespace lslidar_driver
 					scan_points_[k].intensity = 0;
 				}
 				pre_time_ = time_;
+				time_ = get_clock()->now();
 				lock.unlock();
 				pubscan_cond_.notify_one();
-				time_ = get_clock()->now();
 			}
 			else
 			{
@@ -942,9 +944,9 @@ namespace lslidar_driver
 					scan_points_[k].intensity = 0;
 				}
 				pre_time_ = time_;
+				time_ = get_clock()->now();
 				lock.unlock();
 				pubscan_cond_.notify_one();
-				time_ = get_clock()->now();
 			}
 			else
 			{
@@ -992,7 +994,7 @@ namespace lslidar_driver
 					}
 					else
 					{
-						scan->header.stamp = this->now(); // timestamp will obtained from sweep data stamp
+						scan->header.stamp = start_time;
 					}
 
 					scan->angle_min = 0;
@@ -1004,8 +1006,8 @@ namespace lslidar_driver
 					scan->ranges.assign(scan_num, std::numeric_limits<float>::infinity());
 					scan->intensities.reserve(scan_num);
 					scan->intensities.assign(scan_num, std::numeric_limits<float>::infinity());
-					// scan->scan_time = scan_time;
-					// scan->time_increment = scan_time / (double)(count_num);
+					scan->scan_time = scan_time;
+					scan->time_increment = scan_time / (double)(count_num);
 
 					for (int k = 0; k < scan_num; k++)
 					{
@@ -1128,7 +1130,11 @@ namespace lslidar_driver
 				if (pubScan)
 				{
 					auto scan = sensor_msgs::msg::LaserScan::UniquePtr(new sensor_msgs::msg::LaserScan());
-					int scan_num = ceil((angle_able_max - angle_able_min) / 360 * count_num) + 1;
+					const bool clockwise_full_scan =
+						(lidar_name == "N10" || lidar_name == "L10") &&
+						angle_able_min == 0.0 && angle_able_max == 360.0;
+					int scan_num = clockwise_full_scan ? count_num :
+						ceil((angle_able_max - angle_able_min) / 360 * count_num) + 1;
 
 					std::vector<ScanPoint> points;
 					rclcpp::Time start_time;
@@ -1141,10 +1147,16 @@ namespace lslidar_driver
 					}
 					else
 					{
-						scan->header.stamp = this->now(); // timestamp will obtained from sweep data stamp
+						scan->header.stamp = start_time;
 					}
 
-					if (angle_able_max > 360)
+					if (clockwise_full_scan)
+					{
+						scan->angle_min = 0.0;
+						scan->angle_max = -2 * M_PI;
+						scan->angle_increment = -2 * M_PI / (double)(count_num - 1);
+					}
+					else if (angle_able_max > 360)
 					{
 						scan->angle_min = 2 * M_PI * (angle_able_min - 360) / 360;
 						scan->angle_max = 2 * M_PI * (angle_able_max - 360) / 360;
@@ -1154,7 +1166,8 @@ namespace lslidar_driver
 						scan->angle_min = 2 * M_PI * angle_able_min / 360;
 						scan->angle_max = 2 * M_PI * angle_able_max / 360;
 					}
-					scan->angle_increment = 2 * M_PI / (double)(count_num - 1);
+					if (!clockwise_full_scan)
+						scan->angle_increment = 2 * M_PI / (double)(count_num - 1);
 
 					scan->range_min = min_range;
 					scan->range_max = max_range;
@@ -1162,18 +1175,24 @@ namespace lslidar_driver
 					scan->ranges.assign(scan_num, std::numeric_limits<float>::infinity());
 					scan->intensities.reserve(scan_num);
 					scan->intensities.assign(scan_num, std::numeric_limits<float>::infinity());
-					// scan->scan_time = scan_time;
-					// scan->time_increment = scan_time / (double)(count_num - 1);
+					scan->scan_time = scan_time;
+					scan->time_increment = scan_time / (double)(count_num - 1);
 
 					int start_num = floor(angle_able_min * count_num / 360);
 					int end_num = floor(angle_able_max * count_num / 360);
 
 					for (int i = 0; i < count_num; i++)
 					{
-						int point_idx = round((360 - points[i].degree) * count_num / 360);
-						if (point_idx < (end_num - count_num))
-							point_idx += count_num;
-						point_idx = point_idx - start_num;
+						int point_idx;
+						if (clockwise_full_scan)
+							point_idx = round(points[i].degree * (count_num - 1) / 360);
+						else
+						{
+							point_idx = round((360 - points[i].degree) * count_num / 360);
+							if (point_idx < (end_num - count_num))
+								point_idx += count_num;
+							point_idx = point_idx - start_num;
+						}
 						if (point_idx < 0 || point_idx >= scan_num)
 							continue;
 						if (points[i].range == 0.0)

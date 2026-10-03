@@ -1,10 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- PC 端 CycloneDDS 配置：本机靠 loopback 组播，跨机靠单播 peer 指向 Jetson -->
+<!-- PC 端 CycloneDDS 配置：跨机单播 peer 指向 Jetson -->
 <CycloneDDS xmlns="https://cdds.io/config">
   <Domain>
+    <General>
+      <Interfaces>
+        <NetworkInterface name="wlp4s0"/>
+      </Interfaces>
+    </General>
     <Discovery>
       <Peers>
-        <Peer address="192.168.3.136"/>
+        <Peer address="192.168.166.76"/>
       </Peers>
     </Discovery>
   </Domain>

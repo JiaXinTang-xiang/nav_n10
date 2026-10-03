@@ -13,7 +13,7 @@
    ┌─────────────────────────────────────────────────┐
    │                                                 │
    │  Jetson（车上，主脑）          PC（遥控 + 显示）   │
-   │  IP: 192.168.3.136 (DHCP)      IP: <PC 自己查>   │
+   │  IP: 192.168.166.76 (DHCP)     IP: 192.168.166.45 │
    │  user: jiaxintang              user: <PC 用户>   │
    │                                                 │
    │  跑：三路传感器 + RSP +       跑：RViz + 键盘遥控  │
@@ -33,8 +33,8 @@
 # ================= ROS2 多机通信（Jetson 端）=================
 export ROS_DOMAIN_ID=0          # 与 PC 保持一致（两边都必须是 0）
 export ROS_LOCALHOST_ONLY=0     # 允许跨机通信，绝不能设成 1
-# 备选：若 FastDDS 发现失败，装 ros-humble-rmw-cyclonedds 后取消下面这行注释
-# export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+export CYCLONEDDS_URI=file:///home/jiaxintang/Desktop/nav_n10/cyclonedds/cyclonedds-jetson.xml
 ```
 
 Jetson 端现状快照（PC 端 AI 可据此判断，勿重复配置）：
@@ -44,10 +44,10 @@ Jetson 端现状快照（PC 端 AI 可据此判断，勿重复配置）：
 | ROS2 发行版 | Humble |
 | 用户 / 主机名 | `jiaxintang` / `jiaxintang` |
 | WiFi 网卡 | `wlP1p1s0` |
-| 当前 IP | `192.168.3.136`（**DHCP，会变**） |
-| RMW | 默认 FastDDS（未设 `RMW_IMPLEMENTATION`） |
+| 当前 IP | `192.168.166.76`（**DHCP，会变**） |
+| RMW | CycloneDDS |
 | SSH | `sshd` 已运行（`active`） |
-| CycloneDDS | 未安装（备选，见第 6 节） |
+| CycloneDDS | 已安装并验证 PC 能收到 Jetson 话题 |
 | 防火墙 ufw | 已安装，状态未确认（需 root，见第 6 节） |
 | `ROS_LOCALHOST_ONLY` | `0`（正确，绝不要改成 1） |
 
@@ -62,7 +62,7 @@ PC 必须装了 **ROS2 Humble**（与 Jetson 一致）。没装先装。
 1. PC 和 Jetson 连**同一个** WiFi。
 2. 进路由器后台关掉「**AP 隔离 / 客户端隔离 / Client Isolation / 无线隔离**」——这是多机发现失败的第一大原因。
 3. 记下 PC 自己的 IP：`hostname -I`
-4. 互 ping 通：`ping 192.168.3.136`（Jetson 的 IP 若变了，先在 Jetson 上 `hostname -I` 重新查）
+4. 互 ping 通：`ping 192.168.166.76`（Jetson 的 IP 若变了，先在 Jetson 上 `hostname -I` 重新查）
 
 ### 3.3 写 ROS2 多机环境变量（PC 端）
 PC 的 `~/.bashrc` 末尾加**同样**三行（关键：`ROS_DOMAIN_ID` 两边必须一致 = 0，`ROS_LOCALHOST_ONLY` 必须 0）：
@@ -71,7 +71,8 @@ PC 的 `~/.bashrc` 末尾加**同样**三行（关键：`ROS_DOMAIN_ID` 两边�
 # ================= ROS2 多机通信（PC 端）=================
 export ROS_DOMAIN_ID=0
 export ROS_LOCALHOST_ONLY=0
-# export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp   # 备选，见第 6 节
+export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+export CYCLONEDDS_URI=file:///home/jiaxintang/桌面/nav_n10/cyclonedds/cyclonedds-pc.xml
 ```
 
 写完后 `source ~/.bashrc`，或重开终端。
@@ -87,7 +88,7 @@ sudo ufw disable        # 若 PC 上 ufw 是 active 的话；inactive 就跳过
 
 1. **Jetson 上**（SSH 进去）起数据：
    ```bash
-   bash ~/Desktop/nav_n10/robot_bringup.sh
+   bash ~/Desktop/nav_n10/slam_bringup.sh
    ```
 2. **PC 上**新终端：
    ```bash
@@ -108,37 +109,18 @@ sudo ufw disable        # 若 PC 上 ufw 是 active 的话；inactive 就跳过
 
 ### SSH 进 Jetson（PC 上执行）
 ```bash
-ssh jiaxintang@192.168.3.136
+ssh jiaxintang@192.168.166.76
 ```
 
-### Jetson 终端 1 — 起三路数据
+### Jetson 终端 — 一键起三路数据 + SLAM
 ```bash
-bash ~/Desktop/nav_n10/robot_bringup.sh
-```
-
-### Jetson 终端 2 — 起 SLAM 栈
-```bash
-source /opt/ros/humble/setup.bash
-source ~/Desktop/nav_n10/ros2_ws/install/setup.bash
-ros2 run robot_state_publisher robot_state_publisher --ros-args \
-  -p robot_description:='<?xml version="1.0"?><robot name="lsn10_robot"><link name="base_link"/><link name="imu_link"/><link name="laser"/><joint name="imu_joint" type="fixed"><parent link="base_link"/><child link="imu_link"/><origin xyz="0 0 0.05" rpy="0 0 0"/></joint><joint name="laser_joint" type="fixed"><parent link="base_link"/><child link="laser"/><origin xyz="0 0 0.1" rpy="0 0 0"/></joint></robot>' &
-ros2 run cartographer_ros cartographer_node \
-  -configuration_directory ~/Desktop/nav_n10/ros2_ws/install/lslidar_driver/share/lslidar_driver/config \
-  -configuration_basename lsn10.lua \
-  --ros-args -p use_sim_time:=false --remap imu:=/imu/data
-```
-
-### Jetson 终端 3 — 占据栅格地图
-```bash
-source /opt/ros/humble/setup.bash
-source ~/Desktop/nav_n10/ros2_ws/install/setup.bash
-ros2 run cartographer_ros cartographer_occupancy_grid_node --ros-args -p resolution:=0.05
+bash ~/Desktop/nav_n10/slam_bringup.sh
 ```
 
 ### PC 终端 A — RViz（在 PC 本地跑，不是 Jetson）
 ```bash
-source /opt/ros/humble/setup.bash
-ros2 run rviz2 rviz2
+cd ~/桌面/nav_n10
+./pc_rviz.sh
 # 手动：Fixed Frame = map，Add → /scan (LaserScan)、/map (Map)
 ```
 > 不要用 Jetson 上那份 `lsn10_cartographer.rviz`（它引用了 Jetson 没有的 cartographer_rviz / wyca 插件，会报一堆加载失败但无害）。PC 直接开干净 rviz 手动加显示即可。
@@ -181,4 +163,4 @@ ros2 run teleop_twist_keyboard teleop_twist_keyboard
 
 ## 7. 给 PC 端 AI 的一句话结论
 
-Jetson 已经配好（`ROS_DOMAIN_ID=0`、`ROS_LOCALHOST_ONLY=0`、sshd 运行中、WiFi IP 192.168.3.136）。PC 端只需：**连同一 WiFi + 关 AP 隔离 + 写同样两行 env + 关防火墙**，然后用 `ssh jiaxintang@192.168.3.136` 进去发指令、本地跑 RViz。第一步先验证 `ros2 topic list` 能看到话题，再上第 5 节全流程。
+Jetson 跑传感器与 SLAM，PC 通过 `ssh jiaxintang@192.168.166.76` 远程控制，并在本地运行 `./pc_rviz.sh` 显示。已用 CycloneDDS 实测 PC 能接收 Jetson 发布的 ROS 2 话题。

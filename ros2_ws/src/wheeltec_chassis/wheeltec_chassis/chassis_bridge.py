@@ -54,7 +54,8 @@ class ChassisBridge(Node):
         self._odom_pub = self.create_publisher(Odometry, '/odom', 50)
 
         # TF 广播
-        self._tf_broadcaster = TransformBroadcaster(self)
+        self._tf_broadcaster = (
+            TransformBroadcaster(self) if self._publish_tf else None)
 
         # 订阅 /cmd_vel
         self._cmd_sub = self.create_subscription(

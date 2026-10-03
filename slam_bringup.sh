@@ -5,24 +5,34 @@
 WS="${HOME}/Desktop/nav_n10"
 export ROS_DOMAIN_ID=0
 export ROS_LOCALHOST_ONLY=0
+export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+export CYCLONEDDS_URI="file://${WS}/cyclonedds/cyclonedds-jetson.xml"
 source /opt/ros/humble/setup.bash
 
-echo "=== [1/5] 清理旧进程 ==="
+echo "=== [1/5] 清理旧进程(含导航节点，避免和 Cartographer 抢 map→odom) ==="
 pkill -9 -f chassis_bridge                2>/dev/null
 pkill -9 -f anoros_dt                     2>/dev/null
 pkill -9 -f lslidar_driver_node           2>/dev/null
 pkill -9 -f robot_state_publisher         2>/dev/null
 pkill -9 -f cartographer_node             2>/dev/null
 pkill -9 -f cartographer_occupancy_grid_node 2>/dev/null
-pkill -9 -f "ros2 run"                    2>/dev/null
-pkill -9 -f ros2-daemon                   2>/dev/null
+pkill -9 -f amcl                          2>/dev/null
+pkill -9 -f map_server                    2>/dev/null
+pkill -9 -f controller_server             2>/dev/null
+pkill -9 -f planner_server                2>/dev/null
+pkill -9 -f behavior_server               2>/dev/null
+pkill -9 -f bt_navigator                  2>/dev/null
+pkill -9 -f lifecycle_manager             2>/dev/null
+pkill -9 -f velocity_smoother             2>/dev/null
 sleep 2
-ros2 daemon start >/dev/null 2>&1
+ros2 daemon stop >/dev/null 2>&1 || true
+ros2 daemon start >/dev/null 2>&1 || true
 
 echo "=== [2/5] 三路数据 ==="
 source "${WS}/ros2_ws/install/setup.bash"
 nohup ros2 run wheeltec_chassis chassis_bridge --ros-args \
-  --params-file "${WS}/ros2_ws/src/wheeltec_chassis/config/chassis.yaml" > /tmp/chassis.log 2>&1 &
+  --params-file "${WS}/ros2_ws/src/wheeltec_chassis/config/chassis.yaml" \
+  -p publish_tf:=false > /tmp/chassis.log 2>&1 &
 nohup ros2 run anorosdt2 anoros_dt --ros-args \
   --params-file "${WS}/ros2_ws/src/anorosdt2/config/anorosdt2.yaml" > /tmp/anoro.log 2>&1 &
 nohup ros2 run lslidar_driver lslidar_driver_node --ros-args \
@@ -38,7 +48,8 @@ echo "=== [4/5] Cartographer 建图 ==="
 nohup ros2 run cartographer_ros cartographer_node \
   -configuration_directory "${WS}/ros2_ws/install/lslidar_driver/share/lslidar_driver/config" \
   -configuration_basename lsn10.lua \
-  --ros-args -p use_sim_time:=false --remap imu:=/imu/data > /tmp/carto.log 2>&1 &
+  --ros-args -p use_sim_time:=false \
+  --remap imu:=/imu/data --remap odom:=/odom > /tmp/carto.log 2>&1 &
 sleep 3
 
 echo "=== [5/5] 占据栅格地图 ==="

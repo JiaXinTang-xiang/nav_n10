@@ -45,6 +45,7 @@ class AnoParser:
         self._cnt = 0
         self._data_cnt = 0
         self._data_len = 0
+        self._buffer = bytearray()
 
         # 解析出的 IMU 数据
         self.acc_x = 0.0
@@ -108,6 +109,34 @@ class AnoParser:
 
         return False
 
+    def feed_bytes(self, data: bytes) -> bool:
+        """批量解析串口数据，避免在 ROS 节点层逐字节调用状态机。"""
+        self._buffer.extend(data)
+        orientation_updated = False
+
+        while True:
+            header_index = self._buffer.find(bytes((ANO_HEADER,)))
+            if header_index < 0:
+                self._buffer.clear()
+                break
+            if header_index > 0:
+                del self._buffer[:header_index]
+            if len(self._buffer) < 4:
+                break
+
+            data_len = self._buffer[3]
+            frame_len = data_len + 6
+            if len(self._buffer) < frame_len:
+                break
+
+            frame = bytes(self._buffer[:frame_len])
+            del self._buffer[:frame_len]
+            if self._checksum(frame, data_len + 4, frame[-2], frame[-1]):
+                orientation_updated |= self._dispatch(
+                    frame[2], frame[4:4 + data_len])
+
+        return orientation_updated
+
     # ─── 内部 ──────────────────────────────────────────────────────
 
     def _checksum(self, buf, length, sc1_recv, sc2_recv) -> bool:
@@ -133,7 +162,7 @@ class AnoParser:
             self.gyr_y = self.gyr_y / 16.384 * math.pi / 180.0
             self.gyr_z = self.gyr_z / 16.384 * math.pi / 180.0
 
-            return True
+            return False
 
         if frame_id == FRAME_ID_QUAT and len(payload) >= 8:
             # 四元数：int16 / 10000
@@ -159,12 +188,16 @@ class AnorosDTNode(Node):
         self.declare_parameter('serial_baud', 921600)
         self.declare_parameter('pub_topic', '/imu/data')
         self.declare_parameter('frame_id', 'imu_link')
+        self.declare_parameter('publish_rate_hz', 200.0)
 
         # 获取参数
         port = self.get_parameter('serial_port').value
         baud = self.get_parameter('serial_baud').value
         topic = self.get_parameter('pub_topic').value
         self._frame_id = self.get_parameter('frame_id').value
+        publish_rate_hz = self.get_parameter('publish_rate_hz').value
+        self._publish_period_ns = int(1e9 / publish_rate_hz)
+        self._last_publish_ns = 0
 
         # 创建发布者
         self._pub = self.create_publisher(Imu, topic, 200)
@@ -175,8 +208,8 @@ class AnorosDTNode(Node):
         # 协议解析器
         self._parser = AnoParser()
 
-        # 定时器轮询串口 (1ms 周期)
-        self._timer = self.create_timer(0.001, self._poll)
+        # 批量轮询串口，减少 921600 bps 下的 Python 逐字节开销
+        self._timer = self.create_timer(0.002, self._poll)
 
         # 已知的串口读取方法
         self._reader = None
@@ -232,10 +265,11 @@ class AnorosDTNode(Node):
             self._feed_bytes(b)
 
     def _feed_bytes(self, data: bytes):
-        now = self.get_clock().now()
-        for byte in data:
-            if self._parser.feed(byte):
+        if self._parser.feed_bytes(data):
+            now = self.get_clock().now()
+            if now.nanoseconds - self._last_publish_ns >= self._publish_period_ns:
                 self._publish_imu(now)
+                self._last_publish_ns = now.nanoseconds
 
     def _publish_imu(self, stamp):
         """发布 sensor_msgs/Imu"""
