@@ -80,14 +80,14 @@ controller_server:
       max_vel_x: 0.5                # 最快 0.5 m/s
       max_vel_y: 0.0                # 不能侧移
       min_vel_y: 0.0
-      max_vel_theta: 1.5            # 最大角速度
-      min_vel_theta: -1.5
-      acc_lim_x: 0.5                # 加速度
+      max_vel_theta: 2.5            # 提高原地旋转轮速，跨过电机低速死区
+      min_vel_theta: -2.5
+      acc_lim_x: 1.0                # 加快起步
       acc_lim_y: 0.0
-      acc_lim_theta: 2.0
-      min_speed_xy: 0.0
+      acc_lim_theta: 3.0
+      min_speed_xy: 0.2             # 非零直线指令不低于 0.2 m/s
       max_speed_xy: 0.5
-      min_speed_theta: 0.0
+      min_speed_theta: 0.8          # 非零旋转指令不低于 0.8 rad/s
       vx_samples: 20
       vy_samples: 0
       vtheta_samples: 40
@@ -144,8 +144,8 @@ behavior_server:
     robot_base_frame: "base_link"
     transform_tolerance: 0.5
     simulate_ahead_time: 1.5
-    max_rotational_vel: 1.5
-    min_rotational_vel: 0.4
+    max_rotational_vel: 2.5
+    min_rotational_vel: 0.8
     rotational_acc_lim: 3.2
 
 # 全局代价地图
@@ -234,8 +234,8 @@ velocity_smoother:
     smoothing_frequency: 20.0
     scale_velocities: false
     feedback: "OPEN_LOOP"
-    max_velocity: [0.5, 0.0, 1.5]
-    min_velocity: [-0.2, 0.0, -1.5]
-    max_accel: [0.5, 0.0, 2.0]
-    max_decel: [0.5, 0.0, 2.0]
+    max_velocity: [0.5, 0.0, 2.5]
+    min_velocity: [-0.2, 0.0, -2.5]
+    max_accel: [1.0, 0.0, 3.0]
+    max_decel: [1.0, 0.0, 3.0]
     odom_topic: "/odom"
