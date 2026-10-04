@@ -1,0 +1,19 @@
+1.建立工作空间
+mkdir -p ~/catkin_ws/src
+2.进入src
+cd ~/catkin_ws/src
+3.初始化文件夹
+ catkin_init_workspace
+4.进入工作空间
+cd ~/catkin_ws/
+5.编译工作空间
+catkin_make
+6.设置环境变量
+ echo "source ~/catkin_ws/devel/setup.bash" >> ~/.bashrc
+7.将功能包导入src中
+
+8.编译工作空间报错误，提示找不到头文件
+解决办法：将anorosdt_h文件夹里面的文件复制到工作空间下面的：catkin_ws/devel/include/anorosdt中 在进行编译
+
+9.编译工作空间报错，提示找不到 serial 文件
+解决办法：使用chmod 777 AnoUartDependentInstall.sh 添加权限 在运行 ./AnoUartDependentInstall.sh 进行安装 按照后在编译

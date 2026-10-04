@@ -1,0 +1,12 @@
+Header header
+uint8 FIX_STA
+uint8 S_NUM
+int32 LNG
+int32 LAT
+int32 ALT_GPS
+int16 N_SPE
+int16 E_SPE
+int16 D_SPE
+uint8 PDOP_001
+uint8 SACC_001
+uint8 VACC_001

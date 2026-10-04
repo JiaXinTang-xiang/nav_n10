@@ -123,6 +123,7 @@ cd ~/桌面/nav_n10
 ./pc_rviz.sh
 # 手动：Fixed Frame = map，Add → /scan (LaserScan)、/map (Map)
 ```
+脚本会在 PC 本地加载 ROS 2 Humble、设置 CycloneDDS 环境并启动 RViz；不需要在 Jetson 上执行，也不会重启建图。
 > 不要用 Jetson 上那份 `lsn10_cartographer.rviz`（它引用了 Jetson 没有的 cartographer_rviz / wyca 插件，会报一堆加载失败但无害）。PC 直接开干净 rviz 手动加显示即可。
 
 ### PC 终端 B — 键盘遥控（发 /cmd_vel 到车上）

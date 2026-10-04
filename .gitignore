@@ -7,6 +7,26 @@
 **/install/
 **/log/
 
+# ROS 1 / Catkin generated workspaces
+**/devel/
+**/.catkin_workspace
+
+# Local reference projects: keep source/configuration, ignore build products
+/参考/**/build/
+/参考/**/devel/
+/参考/**/build_isolated/
+/参考/**/devel_isolated/
+/参考/**/install_isolated/
+/参考/**/.catkin_workspace
+/参考/**/CMakeCache.txt
+/参考/**/CMakeFiles/
+/参考/**/compile_commands.json
+/参考/**/.pytest_cache/
+
+# tf2_tools generated graph exports
+/frames_*.gv
+/frames_*.pdf
+
 # CMake / Ninja / Make
 **/cmake-build-*/
 **/CMakeFiles/
@@ -29,6 +49,10 @@
 # Compiler, linker, and firmware outputs
 *.o
 *.obj
+*.a
+*.so
+*.so.*
+*.dylib
 *.d
 *.dep
 *.crf
