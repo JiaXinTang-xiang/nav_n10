@@ -56,6 +56,8 @@ void Chassis_SetWheelRaw(int left, int right);
  * @brief  差速运动学逆解: 整车线速度/角速度 -> 左右轮速
  * @param  v_mps    线速度 (米/秒)
  * @param  w_radps  角速度 (弧度/秒)
+ * @note   w=0 的新直行段锁定当前 IMU 航向；同方向连续指令保持参考角度。
+ *         停车、转弯、超时或前后换向后重新锁定。非零转向不启用角度环。
  */
 void Chassis_SetTwist(float v_mps, float w_radps);
 
@@ -83,6 +85,12 @@ void Chassis_ResetOdom(void);
  * @brief  左右轮目标速度 (只读)
  */
 float Chassis_GetTarget(EncoderID_t wheel);
+
+float Chassis_GetGyroRateRadps(void);
+float Chassis_GetGyroCorrectionRadps(void);
+uint8_t Chassis_IsStraightHoldEnabled(void);
+uint8_t Chassis_IsAngleHoldEnabled(void);
+void Chassis_DebugDisplayGyro(void);
 
 /**
  * @brief  上电自检: 软件翻转 A 相引脚, 验证捕获通路
@@ -116,6 +124,13 @@ void Chassis_DebugDisplayIsr(void);
  * @brief  速度环测试: 两轮目标速度设为 +0.2 m/s 闭环运行
  */
 void Chassis_TestSpeedStart(void);
+
+/** @brief 低速直行测试：前进方向等效于 Load(-20,-20)，启用陀螺仪修正 */
+void Chassis_TestGyroStraightStart(void);
+
+/** @brief 模式6：锁定启动 yaw 的角度 P 环直行测试，无 Ki/角速度阻尼 */
+void Chassis_TestAngleStraightStart(void);
+void Chassis_DebugDisplayAngleTest(void);
 
 /**
  * @brief  开环基准测试: 用 Load(-20,-20) 那个 PWM 值直接跑

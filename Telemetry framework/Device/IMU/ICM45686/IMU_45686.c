@@ -30,6 +30,8 @@ float TTangles_gyro[7]; //彤彤滤波角度
 float Angle_Final[3];	//X最终倾斜角度
 float halfT;
 float Kp = 10.0f;
+static volatile float s_yaw_rate_radps;
+static volatile float s_yaw_deg;
 
 extern volatile uint32_t nowtime;
 
@@ -192,6 +194,7 @@ void IMU_getValues(float * values) {
 	values[3] =  accgyroval[3] - gyro_offset[0];
 	values[4] =  accgyroval[4] - gyro_offset[1];
 	values[5] =  accgyroval[5] - gyro_offset[2];
+	s_yaw_rate_radps = values[5] * M_PI / 180.0f;
 	
 
 		//这里已经将量程改成了 1000度每秒  32.8 对应 1度每秒
@@ -363,7 +366,18 @@ void IMU_getYawPitchRoll(float * angles) {
   angles[0] = -atan2(2 * q[1] * q[2] + 2 * q[0] * q[3], -2 * q[2]*q[2] - 2 * q[3] * q[3] + 1)* 180/M_PI; // yaw
   angles[1] = -asin(-2 * q[1] * q[3] + 2 * q[0] * q[2])* 180/M_PI; // pitch
   angles[2] = atan2(2 * q[2] * q[3] + 2 * q[0] * q[1], -2 * q[1] * q[1] - 2 * q[2] * q[2] + 1)* 180/M_PI; // roll
+  s_yaw_deg = angles[0]; /* 单次发布，200Hz 底盘任务只读，不访问 SPI。 */
  // if(angles[0]<0)angles[0]+=360.0f;  //将 -+180度  转成0-360度
+}
+
+float IMU_GetYawRateRadps(void)
+{
+  return s_yaw_rate_radps;
+}
+
+float IMU_GetYawDeg(void)
+{
+  return s_yaw_deg;
 }
 
  void IMU_TT_getgyro(float * zsjganda)

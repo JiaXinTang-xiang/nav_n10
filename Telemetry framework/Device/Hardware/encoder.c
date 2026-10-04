@@ -56,6 +56,11 @@ static          int32_t s_last_raw[ENC_COUNT];    /* 上一次取走的原始计
 static volatile uint8_t s_last_state[ENC_COUNT];  /* 上一次 (A,B) 状态, bit0=A bit1=B */
 static Encoder_t        s_enc[ENC_COUNT];
 
+static const float s_meters_per_count[ENC_COUNT] = {
+    ENC_METERS_PER_COUNT * ENC_LEFT_DISTANCE_SCALE,
+    ENC_METERS_PER_COUNT * ENC_RIGHT_DISTANCE_SCALE
+};
+
 /* ======================== 私有函数 ======================== */
 
 /**
@@ -312,8 +317,8 @@ void Encoder_Update(void)
         s_enc[i].delta        = (int16_t)d_signed;
         now                   = s_enc[i].count + d_signed;
         s_enc[i].count        = now;
-        s_enc[i].distance_m   = (float)now * ENC_METERS_PER_COUNT;
-        s_enc[i].velocity_mps = ((float)d_signed * ENC_METERS_PER_COUNT) / ENC_SAMPLE_PERIOD_S;
+        s_enc[i].distance_m   = (float)now * s_meters_per_count[i];
+        s_enc[i].velocity_mps = ((float)d_signed * s_meters_per_count[i]) / ENC_SAMPLE_PERIOD_S;
     }
 }
 
@@ -388,4 +393,12 @@ void Encoder_SetDirSign(EncoderID_t id, int8_t sign)
         return;
     }
     s_enc[id].dir_sign = (sign > 0) ? 1 : -1;
+}
+
+float Encoder_GetMetersPerCount(EncoderID_t id)
+{
+    if ((uint8_t)id >= ENC_COUNT) {
+        return ENC_METERS_PER_COUNT;
+    }
+    return s_meters_per_count[id];
 }

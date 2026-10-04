@@ -55,6 +55,10 @@ extern "C" {
 #define ENC_COUNTS_PER_REV     (ENC_LINES_PER_REV * ENC_GEAR_RATIO * ENC_DECODE_FACTOR)
 #define ENC_METERS_PER_COUNT   (WHEEL_CIRCUMFERENCE_M / ENC_COUNTS_PER_REV)
 
+/* 左右轮有效滚动周长修正系数，按卷尺实测分别标定。 */
+#define ENC_LEFT_DISTANCE_SCALE   1.0000f
+#define ENC_RIGHT_DISTANCE_SCALE  1.0000f
+
 /* ======================== 编码器编号 ======================== */
 typedef enum {
     ENC_LEFT  = 0,      /* TIM1, PE11(B/CH2) + PE13(A/CH3) */
@@ -140,6 +144,8 @@ int32_t Encoder_SelfTest(EncoderID_t id, uint16_t toggles);
  * @brief  设置方向符号 (实测"前进时计数为负"时调用, 传 -1 翻转)
  */
 void Encoder_SetDirSign(EncoderID_t id, int8_t sign);
+
+float Encoder_GetMetersPerCount(EncoderID_t id);
 
 #ifdef __cplusplus
 }
