@@ -137,26 +137,31 @@ static float WrapPi(float a)
     return a;
 }
 
+static float BhaskaraSinPositive(float x)
+{
+    float num = x * (CHASSIS_PI - x);
+
+    return (16.0f * num) /
+           (5.0f * CHASSIS_PI * CHASSIS_PI - 4.0f * num);
+}
+
 /**
- * @brief  sin/cos 近似 (Bhaskara I), 误差 < 0.2%
- * @note   本工程没链接 libm, 所以不用 sinf/cosf。
- *         里程计是 5ms 小增量积分, 0.2% 的三角函数误差完全可以忽略。
+ * @brief  使用 Bhaskara I 近似计算 sin/cos，输入角度归一化到 [-pi, pi]
+ * @note   不依赖 libm；在 5ms 里程计积分中，近似误差足够小。
  */
 static void SinCosApprox(float a, float *s, float *c)
 {
     float x = WrapPi(a);
-    float sgn = 1.0f;
-    float num;
+    float ax = (x < 0.0f) ? -x : x;
+    float half_pi = 0.5f * CHASSIS_PI;
+    float sin_abs = BhaskaraSinPositive(ax);
 
-    if (x < 0.0f) {
-        x = -x;
-        sgn = -1.0f;
+    *s = (x < 0.0f) ? -sin_abs : sin_abs;
+    if (ax <= half_pi) {
+        *c = BhaskaraSinPositive(half_pi - ax);
+    } else {
+        *c = -BhaskaraSinPositive(ax - half_pi);
     }
-
-    /* x 在 [0, pi], sin(x) = 4x(pi-x) / (pi^2 + x(pi-x)) */
-    num = x * (CHASSIS_PI - x);
-    *s = sgn * (4.0f * num) / (CHASSIS_PI * CHASSIS_PI + num);
-    *c = (CHASSIS_PI * CHASSIS_PI - 4.0f * num) / (CHASSIS_PI * CHASSIS_PI + num);
 }
 
 /**
