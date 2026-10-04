@@ -1176,7 +1176,7 @@ namespace lslidar_driver
 					scan->intensities.reserve(scan_num);
 					scan->intensities.assign(scan_num, std::numeric_limits<float>::infinity());
 					scan->scan_time = scan_time;
-					scan->time_increment = scan_time / (double)(count_num - 1);
+						scan->time_increment = scan_time / (double)(count_num - 1);
 
 					int start_num = floor(angle_able_min * count_num / 360);
 					int end_num = floor(angle_able_max * count_num / 360);
