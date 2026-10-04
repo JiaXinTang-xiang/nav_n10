@@ -1,0 +1,137 @@
+cmake_minimum_required(VERSION 3.8)
+project(robot_stm32_bridge)
+
+if(NOT CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 17)
+endif()
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+  add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
+
+find_package(ament_cmake REQUIRED)
+find_package(builtin_interfaces REQUIRED)
+find_package(diagnostic_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
+find_package(tf2_ros REQUIRED)
+
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/BridgeStatus.msg"
+  "msg/DemoStatus.msg"
+  "msg/WheelState.msg"
+  DEPENDENCIES builtin_interfaces std_msgs
+)
+
+add_library(protocol_v1 STATIC src/protocol_v1.cpp)
+target_include_directories(protocol_v1 PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+
+add_executable(robot_stm32_bridge_node src/bridge_node.cpp)
+ament_target_dependencies(robot_stm32_bridge_node
+  diagnostic_msgs
+  geometry_msgs
+  nav_msgs
+  rclcpp
+  sensor_msgs
+  std_msgs
+  std_srvs
+  tf2_ros
+)
+target_link_libraries(robot_stm32_bridge_node protocol_v1)
+
+add_library(scan_validity STATIC src/scan_validity.cpp)
+target_include_directories(scan_validity PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+ament_target_dependencies(scan_validity builtin_interfaces rclcpp)
+
+add_library(straight_obstacle_stop_demo_node STATIC
+  src/straight_obstacle_stop_demo.cpp)
+target_include_directories(straight_obstacle_stop_demo_node PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+ament_target_dependencies(straight_obstacle_stop_demo_node
+  geometry_msgs
+  rclcpp
+  sensor_msgs
+  std_msgs
+  std_srvs
+)
+
+add_executable(straight_obstacle_stop_demo
+  src/straight_obstacle_stop_demo_main.cpp)
+ament_target_dependencies(straight_obstacle_stop_demo rclcpp)
+
+rosidl_get_typesupport_target(cpp_typesupport_target
+  ${PROJECT_NAME} rosidl_typesupport_cpp)
+target_link_libraries(robot_stm32_bridge_node "${cpp_typesupport_target}")
+target_link_libraries(straight_obstacle_stop_demo_node
+  scan_validity
+  "${cpp_typesupport_target}"
+)
+target_link_libraries(straight_obstacle_stop_demo
+  straight_obstacle_stop_demo_node)
+
+install(TARGETS
+  protocol_v1
+  robot_stm32_bridge_node
+  scan_validity
+  straight_obstacle_stop_demo
+  straight_obstacle_stop_demo_node
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION lib/${PROJECT_NAME}
+)
+
+install(DIRECTORY include/ DESTINATION include)
+install(DIRECTORY config launch systemd DESTINATION share/${PROJECT_NAME})
+install(PROGRAMS
+  scripts/configure_can3.sh
+  scripts/start_production_bridge.sh
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+
+  ament_add_gtest(protocol_v1_test test/protocol_v1_test.cpp)
+  if(TARGET protocol_v1_test)
+    target_link_libraries(protocol_v1_test protocol_v1)
+  endif()
+
+  ament_add_gtest(scan_validity_test test/scan_validity_test.cpp)
+  if(TARGET scan_validity_test)
+    ament_target_dependencies(scan_validity_test builtin_interfaces rclcpp)
+    target_link_libraries(scan_validity_test scan_validity)
+  endif()
+
+  ament_add_gtest(obstacle_stop_scan_freshness_test
+    test/obstacle_stop_scan_freshness_test.cpp)
+  if(TARGET obstacle_stop_scan_freshness_test)
+    ament_target_dependencies(obstacle_stop_scan_freshness_test
+      geometry_msgs
+      rclcpp
+      sensor_msgs
+      std_msgs
+      std_srvs
+    )
+    target_link_libraries(obstacle_stop_scan_freshness_test
+      straight_obstacle_stop_demo_node
+      "${cpp_typesupport_target}"
+    )
+  endif()
+endif()
+
+ament_export_include_directories(include)
+ament_export_dependencies(rosidl_default_runtime)
+ament_package()

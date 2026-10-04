@@ -1,0 +1,20 @@
+[Unit]
+Description=RobotProject production RPLIDAR and Cartographer localization
+Requires=robot-stm32-bridge.service
+After=robot-stm32-bridge.service network-online.target
+Wants=network-online.target
+RequiresMountsFor=/data/ros2_ws /data/projects/maps /data/logs
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=simple
+User=HwHiAiUser
+ExecStart=/data/ros2_ws/install/robot_slam/lib/robot_slam/start_production_localization.sh
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGINT
+TimeoutStopSec=15
+
+[Install]
+WantedBy=multi-user.target
