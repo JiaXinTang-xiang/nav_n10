@@ -53,7 +53,7 @@ static const uint16_t       s_b_pin[ENC_COUNT]   = { ENC_LEFT_B_Pin,   ENC_RIGHT
 
 static volatile int32_t s_raw_count[ENC_COUNT];   /* 中断里累加的原始计数 */
 static          int32_t s_last_raw[ENC_COUNT];    /* 上一次取走的原始计数 */
-static volatile uint8_t s_last_state[ENC_COUNT];  /* 上一次 (A,B) 状态, bit0=A bit1=B */
+static volatile uint32_t s_isr_edge_count[ENC_COUNT]; /* 诊断: A 相边沿总数 */
 static Encoder_t        s_enc[ENC_COUNT];
 
 static const float s_meters_per_count[ENC_COUNT] = {
@@ -128,6 +128,7 @@ void Encoder_Init(void)
     for (i = 0; i < ENC_COUNT; i++) {
         s_raw_count[i] = 0;
         s_last_raw[i]  = 0;
+        s_isr_edge_count[i] = 0;
         s_enc[i].count        = 0;
         s_enc[i].delta        = 0;
         s_enc[i].distance_m   = 0.0f;
@@ -135,12 +136,6 @@ void Encoder_Init(void)
         s_enc[i].dir_sign     = 1;
         s_enc[i].io_error     = 0;
 
-        /* 用引脚当前的真实电平初始化状态机, 避免首次中断误判一步 */
-        {
-            uint8_t a = ((s_a_port[i]->IDR & s_a_pin[i]) != 0u) ? 1u : 0u;
-            uint8_t b = ((s_b_port[i]->IDR & s_b_pin[i]) != 0u) ? 1u : 0u;
-            s_last_state[i] = (uint8_t)(a | (uint8_t)(b << 1));
-        }
     }
 
     Enc_TimerInit();
@@ -156,7 +151,8 @@ void Encoder_Init(void)
  * @note   这个测试把"定时器捕获 -> NVIC -> 中断 -> 计数"整条链路走一遍,
  *         完全不依赖外部编码器信号, 因此可以把两类问题彻底分开:
  *
- *           返回 ≈ toggles/2 (方向正负不论)  -> 代码通路正常, 问题在外面信号
+ *           返回 ≈ toggles*2 (每次 SET/RESET 都产生一个 A 边沿)
+ *                                      -> 代码通路正常, 问题在外面信号
  *           返回 0                            -> 代码通路有问题, 与硬件无关
  *
  *         做法: 直接把 A 相引脚在 GPIO 输出/复用 之间切换, 制造上升沿和下降沿。
@@ -168,8 +164,8 @@ int32_t Encoder_SelfTest(EncoderID_t id, uint16_t toggles)
     GPIO_TypeDef *port;
     uint16_t      pin;
     uint8_t       af;
-    int32_t       before;
-    int32_t       after;
+    uint32_t      before;
+    uint32_t      after;
     uint16_t      i;
     GPIO_InitTypeDef gpio = {0};
 
@@ -190,12 +186,12 @@ int32_t Encoder_SelfTest(EncoderID_t id, uint16_t toggles)
     /* 先切回普通 GPIO 输出, 这样软件能直接驱动这根线 */
     gpio.Pin   = pin;
     gpio.Mode  = GPIO_MODE_OUTPUT_PP;
-    gpio.Pull  = GPIO_NOPULL;
+    gpio.Pull  = GPIO_PULLUP;
     gpio.Speed = GPIO_SPEED_FREQ_HIGH;
     HAL_GPIO_Init(port, &gpio);
 
     __disable_irq();
-    before = s_raw_count[id];
+    before = s_isr_edge_count[id];
     __enable_irq();
 
     HAL_GPIO_WritePin(port, pin, GPIO_PIN_RESET);
@@ -209,16 +205,16 @@ int32_t Encoder_SelfTest(EncoderID_t id, uint16_t toggles)
     }
 
     __disable_irq();
-    after = s_raw_count[id];
+    after = s_isr_edge_count[id];
     __enable_irq();
 
-    /* 测完把引脚还原成定时器捕获输入 */
+    /* 测完把引脚还原成定时器捕获输入，并保留内部上拉。 */
     gpio.Mode      = GPIO_MODE_AF_PP;
-    gpio.Pull      = GPIO_NOPULL;
+    gpio.Pull      = GPIO_PULLUP;
     gpio.Alternate = af;
     HAL_GPIO_Init(port, &gpio);
 
-    return (after - before);
+    return (int32_t)(after - before);
 }
 
 /**
@@ -226,27 +222,15 @@ int32_t Encoder_SelfTest(EncoderID_t id, uint16_t toggles)
  * @note   没有走 HAL_TIM_IC_CaptureCallback, 是为了省掉 HAL_TIM_IRQHandler
  *         里那一长串分支判断, 把单次中断压到几十个周期
  *
- *         判方向用的是"2 位正交状态机", 而不是简单地读 B 相电平。
- *         A 相每来一个边沿, 取 (A,B) 组成 2 位状态, 和上一次状态比较:
- *
- *           只变 1 位            -> 物理上唯一可能的一步, 一定计数
- *           变 2 位(B 相也跳了) -> 按实际发生的那次跳变算, 通常发生在
- *                                  真实换向、A/B 同时变化的时刻
- *           0 位                 -> 没变化, 忽略
- *
- *         比"读 B 相电平"强在哪: 它把状态当作一个整体看待, 单次采样出错
- *         时不会直接翻转方向, 对 A 相毛刺的容忍度明显更高。
- *
- *         状态编码: bit0 = A, bit1 = B
+ *         当前硬件只在 A 相双边沿触发中断，B 相没有中断。
+ *         因此每次 A 边沿直接读取 B 电平，以 A/B 相位关系判方向；
+ *         不能使用要求 A、B 每个变化都被采样的完整四状态机。
  */
 void Encoder_CaptureIRQ(TIM_TypeDef *inst)
 {
     uint8_t id;
     uint8_t a_level;
     uint8_t b_level;
-    uint8_t code;
-    uint8_t prev;
-    uint8_t diff;
     uint8_t forward;
 
     if (inst == ENC_LEFT_TIM) {
@@ -261,28 +245,13 @@ void Encoder_CaptureIRQ(TIM_TypeDef *inst)
         return;
     }
     __HAL_TIM_CLEAR_FLAG(&htim_enc[id], TIM_FLAG_CC3);
+    s_isr_edge_count[id]++;
 
     a_level = ((s_a_port[id]->IDR & s_a_pin[id]) != 0u) ? 1u : 0u;
     b_level = ((s_b_port[id]->IDR & s_b_pin[id]) != 0u) ? 1u : 0u;
 
-    code = (uint8_t)(a_level | (uint8_t)(b_level << 1));
-    prev = s_last_state[id];
-    s_last_state[id] = code;
-
-    diff = (uint8_t)(code ^ prev);
-    if (diff == 0u) {
-        return;                    /* 状态没变, 当成抖动 */
-    }
-
-    /* 物理上 A 跳变时, (A,B) 只会按 00->01->11->10->00 这个序列走。
-       用"新状态对应物理路径上属于上一次状态的下一个"来定方向。 */
-    switch (prev) {
-        case 0x0: forward = (code == 0x1) ? 1u : 0u; break;   /* 00 */
-        case 0x1: forward = (code == 0x3) ? 1u : 0u; break;   /* 01 */
-        case 0x3: forward = (code == 0x2) ? 1u : 0u; break;   /* 11 */
-        case 0x2: forward = (code == 0x0) ? 1u : 0u; break;   /* 10 */
-        default:  forward = (a_level != b_level) ? 1u : 0u; break;
-    }
+    /* 仅 A 相双边沿触发中断，直接以 A/B 相位关系判方向。 */
+    forward = (a_level != b_level) ? 1u : 0u;
 
     if (forward != 0u) {
         s_raw_count[id]++;
@@ -330,6 +299,7 @@ void Encoder_Reset(void)
     for (i = 0; i < ENC_COUNT; i++) {
         s_raw_count[i] = 0;
         s_last_raw[i]  = 0;
+        s_isr_edge_count[i] = 0;
     }
     __enable_irq();
 
@@ -380,8 +350,8 @@ int32_t Encoder_TakeIsrCount(EncoderID_t id)
     }
 
     __disable_irq();
-    n = s_raw_count[id];
-    s_raw_count[id] = 0;
+    n = (int32_t)s_isr_edge_count[id];
+    s_isr_edge_count[id] = 0;
     __enable_irq();
 
     return n;

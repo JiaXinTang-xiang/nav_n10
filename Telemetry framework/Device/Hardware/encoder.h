@@ -2,8 +2,8 @@
  * @file    encoder.h
  * @brief   两轮 AB 相霍尔编码器解码 (不改线方案的软件正交解码)
  * @note    硬件连接 (已固定在 PCB 上, 不可改线):
- *          - 右轮: A -> PA2 (TIM2_CH3)   B -> PA3 (TIM2_CH4)
- *          - 左轮: A -> PE11 (TIM1_CH2)  B -> PE13 (TIM1_CH3)
+ *          - 右轮: A -> PA2 (TIM2_CH3)   B -> PA3 (普通输入)
+ *          - 左轮: A -> PE13 (TIM1_CH3)  B -> PE11 (普通输入)
  *
  *          为什么不能用硬件 Encoder Mode:
  *            STM32 的正交编码器模式 (SMS=001/010/011) 只能把 TI1/TI2 映射到
@@ -13,7 +13,7 @@
  *            - CH3 (PE13 / PA2) 配成"双边沿输入捕获", 每来一个边沿进一次中断,
  *              相当于对 A 相做 2 倍频计数;
  *            - CH2 (PE11 / PA3) 不配定时器, 当普通数字输入用, 在中断里读它的
- *              电平: A/B 同电平 => 正转, 异电平 => 反转 (标准正交判据)。
+ *              电平: A/B 异电平 => 原始正转, 同电平 => 原始反转。
  *
  *            结果: 每转脉冲数 = 线数 x 4 x 减速比 / 2 = 线数 x 减速比 x 2
  *                  13 线 / 1:30 => 780 count/圈, 0.262 mm/count
@@ -132,10 +132,10 @@ int32_t Encoder_TakeIsrCount(EncoderID_t id);
  * @brief  编码器自检: 软件直接翻转 A 相引脚, 验证整条捕获通路
  * @param  id       要自检的轮子
  * @param  toggles  翻转次数 (建议 200)
- * @retval 自检期间累计的计数
+ * @retval 自检期间捕获到的 A 相边沿总数
  *
  * @note   不依赖外部信号, 用来区分"代码问题"和"信号问题":
- *           返回 ≈ toggles/2  -> 代码通路正常, 问题在外部信号
+ *           返回 ≈ toggles*2  -> 代码通路正常, 问题在外部信号
  *           返回 0            -> 代码通路有问题
  */
 int32_t Encoder_SelfTest(EncoderID_t id, uint16_t toggles);

@@ -685,7 +685,7 @@ void Chassis_DebugDisplaySpeedTest(void)
 /**
  * @brief  上电自检: 软件翻转 A 相, 走完整条"捕获->中断->计数"通路
  * @note   200 次翻转 = 200 个上升沿 + 200 个下降沿 = 400 次捕获中断。
- *         期望计数 ≈ +100 (A!=B 判正转, 见 Encoder_CaptureIRQ 的判据)。
+ *         自检返回捕获边沿总数，期望约为 400；固定 B 相时净方向计数会抵消。
  */
 void Chassis_SelfTest(void)
 {
@@ -704,15 +704,15 @@ void Chassis_SelfTest(void)
 
 /**
  * @brief  显示自检结果
- * @note   期望 L/R 都约等于 +100。
+ * @note   期望 L/R 都约等于 400。
  *         L 或 R 为 0 -> 那一路的捕获通路有问题(代码/时钟/NVIC), 与外部信号无关
- *         L 和 R 都约 +100 -> 代码通路正常, 轮子不动就是外部信号的问题
+ *         L 和 R 都约 400 -> 代码通路正常, 轮子不动就是外部信号的问题
  */
 void Chassis_DebugDisplaySelfTest(void)
 {
     OLED_operate_gram(PEN_CLEAR);
     OLED_show_string(1, 0, (uint8_t*)"SELFTEST");
-    OLED_show_string(2, 0, (uint8_t*)"expect ~100");
+    OLED_show_string(2, 0, (uint8_t*)"expect ~400");
     OLED_show_string(3, 0, (uint8_t*)"L,R   :");
     OLED_printf(3, 7, "%d,%d", (int)s_selftest_l, (int)s_selftest_r);
     OLED_show_string(4, 0, (uint8_t*)"press KEY->run");

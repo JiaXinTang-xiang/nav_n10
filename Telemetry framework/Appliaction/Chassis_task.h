@@ -101,7 +101,7 @@ void Chassis_SelfTest(void);
 
 /**
  * @brief  显示自检结果
- * @note   期望值: L/R 都约等于 +100 (A!=B 判为正转)
+ * @note   期望值: L/R 都约等于 400（200 次翻转产生 400 个 A 相边沿）
  */
 void Chassis_DebugDisplaySelfTest(void);
 

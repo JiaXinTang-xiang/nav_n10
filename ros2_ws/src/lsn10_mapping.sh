@@ -30,7 +30,7 @@ cp ${CONFIG_DIR}/lsn10.lua /tmp/lsn10_complete.lua
 sleep 1
 
 echo "=== 第七步：启动Cartographer建图 ==="
-ros2 run cartographer_ros cartographer_node -configuration_directory /tmp -configuration_basename lsn10_complete.lua --ros-args -p use_sim_time:=false -p tracking_frame:=imu_link -p published_frame:=base_link -p num_laser_scans:=1 -p num_multi_echo_laser_scans:=0 -p imu_sampling_ratio:=1 --remap scan:=scan --remap imu:=/imu/data &
+ros2 run cartographer_ros cartographer_node -configuration_directory /tmp -configuration_basename lsn10_complete.lua --ros-args -p use_sim_time:=false -p tracking_frame:=imu_link -p published_frame:=odom -p num_laser_scans:=1 -p num_multi_echo_laser_scans:=0 -p imu_sampling_ratio:=1 --remap scan:=scan --remap imu:=/imu/data &
 sleep 3
 
 echo "=== 第八步：启动地图网格 ==="

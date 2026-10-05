@@ -270,7 +270,8 @@ void HAL_TIM_IC_MspInit(TIM_HandleTypeDef* tim_icHandle)
     PE13     ------> TIM1_CH3  (左轮编码器 A 相, 双边沿输入捕获)
     */
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    /* 板上没有外部上拉，使用 STM32 内部上拉避免编码器输入悬空。 */
+    GPIO_InitStruct.Pull = GPIO_PULLUP;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
 
     /* PE13: A 相, 复用给 TIM1_CH3 做捕获 */
@@ -303,7 +304,8 @@ void HAL_TIM_IC_MspInit(TIM_HandleTypeDef* tim_icHandle)
     PA2/PA3 原本空闲(与 PA0/PA1 的 UART4 无关), 现被编码器占用。
     */
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    /* 板上没有外部上拉，使用 STM32 内部上拉避免编码器输入悬空。 */
+    GPIO_InitStruct.Pull = GPIO_PULLUP;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
 
     /* PA2: A 相, 复用给 TIM2_CH3 做捕获 */

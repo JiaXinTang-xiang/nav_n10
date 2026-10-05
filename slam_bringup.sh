@@ -2,12 +2,19 @@
 # slam_bringup.sh — 一键启动：底盘+IMU+雷达 + RSP + Cartographer + 地图
 # 用法: bash ~/Desktop/nav_n10/slam_bringup.sh
 
-WS="${HOME}/Desktop/nav_n10"
+# 始终使用本脚本所在的工程根目录，避免沿用旧工程 ~/Desktop/nav_n10。
+WS="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 export ROS_DOMAIN_ID=0
 export ROS_LOCALHOST_ONLY=0
 export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 export CYCLONEDDS_URI="file://${WS}/cyclonedds/cyclonedds-jetson.xml"
 source /opt/ros/humble/setup.bash
+
+if [ ! -f "${WS}/ros2_ws/install/setup.bash" ]; then
+  echo "❌ 找不到 ${WS}/ros2_ws/install/setup.bash"
+  echo "请先在工程的 ros2_ws 目录执行 colcon build，再重新运行本脚本。"
+  exit 1
+fi
 
 echo "=== [1/5] 清理旧进程(含导航节点，避免和 Cartographer 抢 map→odom) ==="
 pkill -9 -f chassis_bridge                2>/dev/null
@@ -32,7 +39,7 @@ echo "=== [2/5] 三路数据 ==="
 source "${WS}/ros2_ws/install/setup.bash"
 nohup ros2 run wheeltec_chassis chassis_bridge --ros-args \
   --params-file "${WS}/ros2_ws/src/wheeltec_chassis/config/chassis.yaml" \
-  -p publish_tf:=false > /tmp/chassis.log 2>&1 &
+  -p publish_tf:=true > /tmp/chassis.log 2>&1 &
 nohup ros2 run anorosdt2 anoros_dt --ros-args \
   --params-file "${WS}/ros2_ws/src/anorosdt2/config/anorosdt2.yaml" > /tmp/anoro.log 2>&1 &
 nohup ros2 run lslidar_driver lslidar_driver_node --ros-args \
