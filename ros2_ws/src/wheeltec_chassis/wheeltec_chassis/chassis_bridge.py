@@ -19,6 +19,7 @@ import rclpy
 from rclpy.node import Node
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import TransformStamped, Twist, Quaternion
+from sensor_msgs.msg import Imu
 from std_msgs.msg import Int64MultiArray
 from tf2_ros import TransformBroadcaster
 
@@ -48,6 +49,12 @@ class ChassisBridge(Node):
         self.declare_parameter('right_meters_per_count', 0.0002617994)
         self.declare_parameter('wheel_separation', 0.1431)
         self.declare_parameter('integrate_odom_from_wheel_counts', True)
+        self.declare_parameter('use_imu_yaw_for_turns', True)
+        self.declare_parameter('imu_topic', '/imu/data')
+        self.declare_parameter('imu_yaw_sign', 1.0)
+        self.declare_parameter('imu_turn_rate_threshold', 0.05)
+        self.declare_parameter('imu_timeout_sec', 0.2)
+        self.declare_parameter('imu_max_delta_rad', 0.25)
 
         port = self.get_parameter('serial_port').value
         baud = self.get_parameter('serial_baud').value
@@ -62,6 +69,16 @@ class ChassisBridge(Node):
         self._wheel_separation = float(self.get_parameter('wheel_separation').value)
         self._integrate_from_counts = bool(
             self.get_parameter('integrate_odom_from_wheel_counts').value)
+        self._use_imu_yaw = bool(
+            self.get_parameter('use_imu_yaw_for_turns').value)
+        imu_topic = self.get_parameter('imu_topic').value
+        self._imu_yaw_sign = float(self.get_parameter('imu_yaw_sign').value)
+        self._imu_turn_rate_threshold = float(
+            self.get_parameter('imu_turn_rate_threshold').value)
+        self._imu_timeout_sec = float(
+            self.get_parameter('imu_timeout_sec').value)
+        self._imu_max_delta_rad = float(
+            self.get_parameter('imu_max_delta_rad').value)
 
         if command_rate_hz <= 0.0:
             raise ValueError('command_rate_hz must be greater than zero')
@@ -71,6 +88,14 @@ class ChassisBridge(Node):
             raise ValueError('meters_per_count must be greater than zero')
         if self._wheel_separation <= 0.0:
             raise ValueError('wheel_separation must be greater than zero')
+        if self._imu_yaw_sign == 0.0:
+            raise ValueError('imu_yaw_sign must not be zero')
+        if self._imu_turn_rate_threshold < 0.0:
+            raise ValueError('imu_turn_rate_threshold must not be negative')
+        if self._imu_timeout_sec <= 0.0:
+            raise ValueError('imu_timeout_sec must be greater than zero')
+        if self._imu_max_delta_rad <= 0.0:
+            raise ValueError('imu_max_delta_rad must be greater than zero')
 
         # 串口
         self._open_serial(port, baud)
@@ -87,6 +112,8 @@ class ChassisBridge(Node):
         # 订阅 /cmd_vel
         self._cmd_sub = self.create_subscription(
             Twist, '/cmd_vel', self._cmd_vel_cb, 10)
+        self._imu_sub = self.create_subscription(
+            Imu, imu_topic, self._imu_cb, 100)
 
         self._target_linear = 0.0
         self._target_angular = 0.0
@@ -109,8 +136,14 @@ class ChassisBridge(Node):
         self._odom_theta = 0.0
         self._last_wheel_sample = None
         self._last_sequence = None
+        self._last_imu_yaw = None
+        self._last_imu_time = None
+        self._imu_delta_since_odom = 0.0
+        self._imu_yaw_rate = 0.0
 
-        self.get_logger().info(f'底盘串口已打开: {port} @ {baud} bps')
+        self.get_logger().info(
+            f'底盘串口已打开: {port} @ {baud} bps; '
+            f'转弯IMU辅助: {self._use_imu_yaw}')
 
     # ─── 串口 ──────────────────────────────────────────────────────
 
@@ -164,6 +197,34 @@ class ChassisBridge(Node):
                     if self._rx_buf[self._rx_expect_len - 1] == FOOTER:
                         self._decode_odom(self._rx_buf[0])
 
+    def _imu_cb(self, msg: Imu):
+        """累计飞控四元数的相邻航向变化，供下一帧轮式里程计使用。"""
+        q = msg.orientation
+        norm = math.sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w)
+        if norm < 0.5:
+            return
+
+        yaw = math.atan2(
+            2.0 * (q.w * q.z + q.x * q.y),
+            1.0 - 2.0 * (q.y * q.y + q.z * q.z))
+        yaw *= self._imu_yaw_sign
+        now = self.get_clock().now()
+
+        if self._last_imu_yaw is not None and self._last_imu_time is not None:
+            dt = (now - self._last_imu_time).nanoseconds / 1e9
+            delta = math.atan2(
+                math.sin(yaw - self._last_imu_yaw),
+                math.cos(yaw - self._last_imu_yaw))
+            if 0.0 < dt <= self._imu_timeout_sec and abs(delta) <= self._imu_max_delta_rad:
+                self._imu_delta_since_odom += delta
+                self._imu_yaw_rate = delta / dt
+            else:
+                self._imu_delta_since_odom = 0.0
+                self._imu_yaw_rate = 0.0
+
+        self._last_imu_yaw = yaw
+        self._last_imu_time = now
+
     def _decode_odom(self, header):
         """解码 0xCC/0xCD 包 → 发布 /wheel_counts、/odom 和 TF"""
         payload_end = 13 if header == HEADER_ODOM else 28
@@ -201,6 +262,7 @@ class ChassisBridge(Node):
                 self._odom_x = x / 1000.0
                 self._odom_y = y / 1000.0
                 self._odom_theta = theta
+                self._imu_delta_since_odom = 0.0
             else:
                 old_tick, old_left, old_right = self._last_wheel_sample
                 tick_delta = (mcu_tick - old_tick) & 0xFFFFFFFF
@@ -209,7 +271,18 @@ class ChassisBridge(Node):
                     dl = (left_count - old_left) * self._left_mpc
                     dr = (right_count - old_right) * self._right_mpc
                     ds = 0.5 * (dl + dr)
-                    dtheta = (dr - dl) / self._wheel_separation
+                    wheel_dtheta = (dr - dl) / self._wheel_separation
+                    dtheta = wheel_dtheta
+                    imu_fresh = (
+                        self._use_imu_yaw and
+                        self._last_imu_time is not None and
+                        (self.get_clock().now() - self._last_imu_time).nanoseconds / 1e9
+                        <= self._imu_timeout_sec)
+                    turning = (
+                        abs(wheel_dtheta / dt) >= self._imu_turn_rate_threshold or
+                        abs(self._imu_yaw_rate) >= self._imu_turn_rate_threshold)
+                    if imu_fresh and turning:
+                        dtheta = self._imu_delta_since_odom
                     linear_velocity = ds / dt
                     angular_velocity = dtheta / dt
                     if self._integrate_from_counts:
@@ -219,6 +292,8 @@ class ChassisBridge(Node):
                         self._odom_theta = math.atan2(
                             math.sin(self._odom_theta + dtheta),
                             math.cos(self._odom_theta + dtheta))
+
+                self._imu_delta_since_odom = 0.0
 
             self._last_sequence = sequence
             self._last_wheel_sample = (mcu_tick, left_count, right_count)

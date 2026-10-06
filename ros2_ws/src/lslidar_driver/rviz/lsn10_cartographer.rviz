@@ -26,11 +26,6 @@ Panels:
       - /Current View1
     Name: Views
     Splitter Ratio: 0.5
-  - Class: teleop_panel/Teleop
-    Name: Teleop
-    Topic: /rt_cmd_vel
-  - Class: wyca_rviz_plugin/Wyca
-    Name: Wyca
   - Class: rviz_common/Time
     Experimental: false
     Name: Time

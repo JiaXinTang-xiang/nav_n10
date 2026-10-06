@@ -7,7 +7,7 @@ options = {
   map_builder = MAP_BUILDER,
   trajectory_builder = TRAJECTORY_BUILDER,
   map_frame = "map",
-  tracking_frame = "imu_link",
+  tracking_frame = "base_link",
   published_frame = "odom",
   odom_frame = "odom",
   -- chassis_bridge 是唯一的 odom -> base_link 发布者；避免 Cartographer 重复发布 TF。
@@ -37,7 +37,8 @@ MAP_BUILDER.use_trajectory_builder_2d = true
 TRAJECTORY_BUILDER_2D.min_range = 0.2
 TRAJECTORY_BUILDER_2D.max_range = 12.
 TRAJECTORY_BUILDER_2D.missing_data_ray_length = 1.
-TRAJECTORY_BUILDER_2D.use_imu_data = true
+-- 转弯 yaw 已由 chassis_bridge 使用飞控 IMU 修正，避免同一 IMU 被重复使用。
+TRAJECTORY_BUILDER_2D.use_imu_data = false
 TRAJECTORY_BUILDER_2D.submaps.num_range_data = 35
 TRAJECTORY_BUILDER_2D.use_online_correlative_scan_matching = true
 TRAJECTORY_BUILDER_2D.real_time_correlative_scan_matcher.linear_search_window = 0.1
@@ -46,12 +47,14 @@ TRAJECTORY_BUILDER_2D.real_time_correlative_scan_matcher.rotation_delta_cost_wei
 TRAJECTORY_BUILDER_2D.ceres_scan_matcher.occupied_space_weight = 10.
 TRAJECTORY_BUILDER_2D.ceres_scan_matcher.translation_weight = 20.
 TRAJECTORY_BUILDER_2D.ceres_scan_matcher.rotation_weight = 40.
-TRAJECTORY_BUILDER_2D.motion_filter.max_time_seconds = 3.
+TRAJECTORY_BUILDER_2D.motion_filter.max_time_seconds = 1.
 TRAJECTORY_BUILDER_2D.motion_filter.max_distance_meters = 0.1
-TRAJECTORY_BUILDER_2D.motion_filter.max_angle_radians = 0.004
+TRAJECTORY_BUILDER_2D.motion_filter.max_angle_radians = 0.05
 
 POSE_GRAPH.optimization_problem.huber_scale = 1e2
-POSE_GRAPH.optimize_every_n_nodes = 35
+POSE_GRAPH.optimize_every_n_nodes = 50
 POSE_GRAPH.constraint_builder.min_score = 0.65
+POSE_GRAPH.constraint_builder.sampling_ratio = 0.15
+POSE_GRAPH.max_num_final_iterations = 50
 
 return options

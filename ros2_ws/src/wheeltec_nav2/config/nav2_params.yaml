@@ -32,8 +32,8 @@ amcl:
     sigma_hit: 0.2
     tf_broadcast: true
     transform_tolerance: 1.0
-    update_min_a: 0.2            # 转 0.2 rad 更新粒子
-    update_min_d: 0.25           # 移 0.25 m 更新粒子
+    update_min_a: 0.05           # 转约2.9度即更新，减少转弯定位滞后
+    update_min_d: 0.10           # 移动10cm即更新
     z_hit: 0.5
     z_max: 0.05
     z_rand: 0.5
@@ -76,18 +76,18 @@ controller_server:
     FollowPath:
       plugin: "dwb_core::DWBLocalPlanner"
       debug_trajectory_details: true
-      min_vel_x: -0.2               # 允许倒退
-      max_vel_x: 0.5                # 最快 0.5 m/s
+      min_vel_x: -0.15              # 允许低速倒退
+      max_vel_x: 0.15               # 建图后首次导航先限制为 0.15 m/s
       max_vel_y: 0.0                # 不能侧移
       min_vel_y: 0.0
-      max_vel_theta: 2.5            # 提高原地旋转轮速，跨过电机低速死区
-      min_vel_theta: -2.5
-      acc_lim_x: 1.0                # 加快起步
+      max_vel_theta: 0.65           # 限制原地旋转最高速度
+      min_vel_theta: -0.65
+      acc_lim_x: 0.4
       acc_lim_y: 0.0
-      acc_lim_theta: 3.0
-      min_speed_xy: 0.2             # 非零直线指令不低于 0.2 m/s
-      max_speed_xy: 0.5
-      min_speed_theta: 0.8          # 非零旋转指令不低于 0.8 rad/s
+      acc_lim_theta: 1.5
+      min_speed_xy: 0.15            # 低于此速度底盘可能无法起步
+      max_speed_xy: 0.15
+      min_speed_theta: 0.4          # 转弯初始速度
       vx_samples: 20
       vy_samples: 0
       vtheta_samples: 40
@@ -144,9 +144,9 @@ behavior_server:
     robot_base_frame: "base_link"
     transform_tolerance: 0.5
     simulate_ahead_time: 1.5
-    max_rotational_vel: 2.5
-    min_rotational_vel: 0.8
-    rotational_acc_lim: 3.2
+    max_rotational_vel: 0.65
+    min_rotational_vel: 0.4
+    rotational_acc_lim: 1.5
 
 # 全局代价地图
 global_costmap:
@@ -234,8 +234,8 @@ velocity_smoother:
     smoothing_frequency: 20.0
     scale_velocities: false
     feedback: "OPEN_LOOP"
-    max_velocity: [0.5, 0.0, 2.5]
-    min_velocity: [-0.2, 0.0, -2.5]
-    max_accel: [1.0, 0.0, 3.0]
-    max_decel: [1.0, 0.0, 3.0]
+    max_velocity: [0.15, 0.0, 0.65]
+    min_velocity: [-0.15, 0.0, -0.65]
+    max_accel: [0.4, 0.0, 1.5]
+    max_decel: [0.4, 0.0, 1.5]
     odom_topic: "/odom"

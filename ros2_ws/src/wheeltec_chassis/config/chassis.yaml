@@ -13,3 +13,11 @@ chassis_bridge:
     right_meters_per_count: 0.0002611298  # 65mm / 右轮实测 782.0 count/圈
     wheel_separation: 0.1431      # 实车360度只报约320度后的有效轮距
     integrate_odom_from_wheel_counts: true
+    # 平移仍由累计轮计数计算；检测到转弯时使用飞控四元数的相邻 yaw 增量。
+    # IMU无数据、超时或发生异常跳变时自动退回轮式转角。
+    use_imu_yaw_for_turns: true
+    imu_topic: "/imu/data"
+    imu_yaw_sign: 1.0
+    imu_turn_rate_threshold: 0.05
+    imu_timeout_sec: 0.2
+    imu_max_delta_rad: 0.25
