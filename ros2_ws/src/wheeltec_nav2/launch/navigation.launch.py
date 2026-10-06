@@ -25,6 +25,7 @@ def generate_launch_description():
     nav2_pkg = get_package_share_directory('wheeltec_nav2')
     chassis_pkg = get_package_share_directory('wheeltec_chassis')
     lidar_pkg = get_package_share_directory('lslidar_driver')
+    imu_pkg = get_package_share_directory('anorosdt2')
     nav2_params = os.path.join(nav2_pkg, 'config', 'nav2_params.yaml')
 
     # ── 参数 ──
@@ -63,6 +64,12 @@ def generate_launch_description():
         parameters=[{'robot_description': robot_description, 'use_sim_time': False}],
         output='screen')
 
+    # ── 飞控 IMU ──
+    imu_node = Node(
+        package='anorosdt2', executable='anoros_dt', name='anoros_dt',
+        parameters=[os.path.join(imu_pkg, 'config', 'anorosdt2.yaml')],
+        output='screen')
+
     # ── 底盘桥接 ──
     chassis_node = Node(
         package='wheeltec_chassis', executable='chassis_bridge',
@@ -84,6 +91,9 @@ def generate_launch_description():
 
     # ── Nav2 生命周期节点 ──
     lifecycle_nodes = [
+        'lslidar_driver_node',
+        'map_server',
+        'amcl',
         'controller_server',
         'planner_server',
         'behavior_server',
@@ -140,6 +150,7 @@ def generate_launch_description():
         rviz_arg,
         lidar_node,
         robot_state_pub,
+        imu_node,
         chassis_node,
         map_server_node,
         amcl_node,
