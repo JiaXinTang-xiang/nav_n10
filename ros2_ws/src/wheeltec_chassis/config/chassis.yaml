@@ -6,6 +6,7 @@ chassis_bridge:
     odom_frame: "odom"
     base_frame: "base_link"
     publish_tf: true
+    serial_poll_rate_hz: 100.0    # 底盘遥测约50Hz，100Hz轮询足够且降低Python占用
     command_rate_hz: 20.0         # 向 STM32 重发速度指令的频率
     command_timeout_sec: 0.5      # /cmd_vel 超时后自动停车
     # 左右轮分别做 10 圈标定后更新：meters_per_count = pi*轮径 / 实测每圈计数
@@ -13,11 +14,16 @@ chassis_bridge:
     right_meters_per_count: 0.0002611298  # 65mm / 右轮实测 782.0 count/圈
     wheel_separation: 0.1431      # 实车360度只报约320度后的有效轮距
     integrate_odom_from_wheel_counts: true
-    # 平移仍由累计轮计数计算；检测到转弯时使用飞控四元数的相邻 yaw 增量。
-    # IMU无数据、超时或发生异常跳变时自动退回轮式转角。
-    use_imu_yaw_for_turns: true
+    # 平移由累计轮计数计算，航向直接跟随飞控四元数的连续 yaw。
+    # IMU无数据、超时或异常跳变时临时退回轮式转角，恢复时重新对齐且不跳变。
+    use_imu_yaw: true
     imu_topic: "/imu/data"
     imu_yaw_sign: 1.0
-    imu_turn_rate_threshold: 0.05
     imu_timeout_sec: 0.2
     imu_max_delta_rad: 0.25
+    # 飞控当前可能持续发布固定单位四元数；转动时自动使用 gyro_z 积分航向。
+    imu_gyro_fallback: true
+    # 当前四元数固定且有量化抖动，禁止运行中切换，固定使用实测正确的gyro_z。
+    imu_force_gyro_yaw: true
+    imu_gyro_deadband_rad_s: 0.03
+    imu_quaternion_stall_delta_rad: 0.0005

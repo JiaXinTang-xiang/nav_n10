@@ -13,7 +13,9 @@ options = {
   -- chassis_bridge 是唯一的 odom -> base_link 发布者；避免 Cartographer 重复发布 TF。
   provide_odom_frame = false,
   publish_frame_projected_to_2d = true,
-  use_pose_extrapolator = true,
+  -- 外部 odom 已经以 50Hz 发布；这里再向当前时刻外推会与扫描时刻的
+  -- odom->base_link 混用，转弯时造成 map->odom 每帧锯齿跳变。
+  use_pose_extrapolator = false,
   use_odometry = true,
   use_nav_sat = false,
   use_landmarks = false,

@@ -8,4 +8,5 @@ anoros_dt:
     serial_baud: 921600
     pub_topic: "/imu/data"
     frame_id: "imu_link"
-    publish_rate_hz: 200.0
+    publish_rate_hz: 100.0
+    serial_poll_rate_hz: 200.0

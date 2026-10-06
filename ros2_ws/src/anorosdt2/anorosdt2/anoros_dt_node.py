@@ -14,6 +14,7 @@ import sys
 
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import Imu
 
 
@@ -188,19 +189,29 @@ class AnorosDTNode(Node):
         self.declare_parameter('serial_baud', 921600)
         self.declare_parameter('pub_topic', '/imu/data')
         self.declare_parameter('frame_id', 'imu_link')
-        self.declare_parameter('publish_rate_hz', 200.0)
+        self.declare_parameter('publish_rate_hz', 100.0)
+        self.declare_parameter('serial_poll_rate_hz', 200.0)
 
         # 获取参数
         port = self.get_parameter('serial_port').value
         baud = self.get_parameter('serial_baud').value
         topic = self.get_parameter('pub_topic').value
         self._frame_id = self.get_parameter('frame_id').value
-        publish_rate_hz = self.get_parameter('publish_rate_hz').value
+        publish_rate_hz = float(self.get_parameter('publish_rate_hz').value)
+        serial_poll_rate_hz = float(
+            self.get_parameter('serial_poll_rate_hz').value)
+        if publish_rate_hz <= 0.0:
+            raise ValueError('publish_rate_hz must be greater than zero')
+        if serial_poll_rate_hz <= 0.0:
+            raise ValueError('serial_poll_rate_hz must be greater than zero')
         self._publish_period_ns = int(1e9 / publish_rate_hz)
         self._last_publish_ns = 0
 
         # 创建发布者
-        self._pub = self.create_publisher(Imu, topic, 200)
+        imu_qos = QoSProfile(
+            depth=1,
+            reliability=ReliabilityPolicy.BEST_EFFORT)
+        self._pub = self.create_publisher(Imu, topic, imu_qos)
 
         # 打开串口
         self._open_serial(port, baud)
@@ -209,7 +220,7 @@ class AnorosDTNode(Node):
         self._parser = AnoParser()
 
         # 批量轮询串口，减少 921600 bps 下的 Python 逐字节开销
-        self._timer = self.create_timer(0.002, self._poll)
+        self._timer = self.create_timer(1.0 / serial_poll_rate_hz, self._poll)
 
         # 已知的串口读取方法
         self._reader = None
@@ -220,7 +231,9 @@ class AnorosDTNode(Node):
             self._reader = self._read_single
 
         self.get_logger().info(f'串口已打开: {port} @ {baud} bps')
-        self.get_logger().info(f'发布 IMU 话题: {topic} (frame_id: {self._frame_id})')
+        self.get_logger().info(
+            f'发布 IMU 话题: {topic} (frame_id: {self._frame_id}, '
+            f'{publish_rate_hz:.0f} Hz; 串口轮询 {serial_poll_rate_hz:.0f} Hz)')
 
     def _open_serial(self, port: str, baud: int):
         """打开串口，兼容不同 pyserial 版本"""

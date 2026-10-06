@@ -16,6 +16,41 @@ if [ ! -f "${WS}/ros2_ws/install/setup.bash" ]; then
   exit 1
 fi
 
+for device in /dev/imu /dev/lidar; do
+  if [ ! -e "${device}" ]; then
+    echo "❌ 缺少设备 ${device}，停止启动SLAM。"
+    exit 1
+  fi
+done
+
+CHASSIS_DEVICE=/dev/chassis
+if [ ! -e "${CHASSIS_DEVICE}" ]; then
+  imu_device="$(readlink -f /dev/imu 2>/dev/null || true)"
+  chassis_candidates=()
+  shopt -s nullglob
+  for candidate in /dev/ttyCH341USB* /dev/ttyUSB*; do
+    if [ "$(readlink -f "${candidate}")" != "${imu_device}" ]; then
+      chassis_candidates+=("${candidate}")
+    fi
+  done
+  shopt -u nullglob
+
+  if [ "${#chassis_candidates[@]}" -eq 1 ]; then
+    CHASSIS_DEVICE="${chassis_candidates[0]}"
+    echo "⚠️ /dev/chassis 不存在，自动使用底盘串口 ${CHASSIS_DEVICE}"
+  else
+    echo "❌ 找不到独立的底盘串口，停止启动SLAM。"
+    if command -v lsusb >/dev/null 2>&1 && \
+       lsusb -v -d 1a86:7523 2>/dev/null | grep -q "USB MIDI"; then
+      echo "❌ 检测到底盘USB被枚举成 USB MIDI，而不是 USB Serial。"
+      echo "   此设备没有 tty 串口接口，不能把 /dev/imu 当作底盘。"
+    fi
+    echo "当前串口设备："
+    ls -l /dev/ttyCH341USB* /dev/ttyUSB* /dev/ttyACM* 2>/dev/null || true
+    exit 1
+  fi
+fi
+
 echo "=== [1/5] 清理旧进程(含导航节点，避免和 Cartographer 抢 map→odom) ==="
 pkill -9 -f chassis_bridge                2>/dev/null
 pkill -9 -f anoros_dt                     2>/dev/null
@@ -39,6 +74,7 @@ echo "=== [2/5] 三路数据 ==="
 source "${WS}/ros2_ws/install/setup.bash"
 nohup ros2 run wheeltec_chassis chassis_bridge --ros-args \
   --params-file "${WS}/ros2_ws/src/wheeltec_chassis/config/chassis.yaml" \
+  -p serial_port:="${CHASSIS_DEVICE}" \
   -p publish_tf:=true > /tmp/chassis.log 2>&1 &
 nohup ros2 run anorosdt2 anoros_dt --ros-args \
   --params-file "${WS}/ros2_ws/src/anorosdt2/config/anorosdt2.yaml" > /tmp/anoro.log 2>&1 &
