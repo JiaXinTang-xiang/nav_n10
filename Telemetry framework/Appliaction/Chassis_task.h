@@ -112,13 +112,17 @@ void Chassis_DebugDisplaySelfTest(void);
 void Chassis_DebugDisplay(void);
 
 /**
- * @brief  诊断显示: 显示引脚上的原始捕获中断频率 (Hz) + 累计计数
+ * @brief  诊断显示: 原始捕获频率、累计计数和不回绕累计 odom 角度
  * @note   用来区分"信号太密/有干扰"和"计数逻辑错":
  *           轮子静止        -> ISR 应该为 0
- *           手转 1 圈/秒    -> ISR 应该约 26 Hz
+ *           手转轮子 1 圈/秒 -> ISR 应该约 780 Hz（13线 x 2边沿 x 30减速比）
+ *           原地旋转多圈     -> th deg 持续累计，不在 +/-180 度回绕
  *           扭一下突然上万   -> 看 ISR 是不是几百 kHz
  */
 void Chassis_DebugDisplayIsr(void);
+
+/** @brief 清零模式 7 的累计计数、里程计和 ISR 频率窗口。 */
+void Chassis_DebugResetIsr(void);
 
 /**
  * @brief  速度环测试: 两轮目标速度设为 +0.2 m/s 闭环运行

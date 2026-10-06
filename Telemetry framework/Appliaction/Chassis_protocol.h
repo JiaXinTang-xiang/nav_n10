@@ -8,13 +8,14 @@
  *     [0xBB][v_linear int16 大端, mm/s][v_angular int16 大端, mrad/s][校验][0x55]
  *     共 7 字节, 校验 = (v_hi + v_lo + w_hi + w_lo) & 0xFF
  *
- *   F407 -> 上位机 (里程计):
- *     [0xCC][x float 小端, mm][y float 小端, mm][theta float 小端, rad][校验][0x55]
- *     共 15 字节, 校验 = (x+y+theta 共 12 字节之和) & 0xFF
+ *   F407 -> 上位机 (里程计与轮计数 V2):
+ *     [0xCD][版本 u8][序号 u16 LE][MCU 100us时基 u32 LE]
+ *     [x/y/theta float32 LE][left/right累计计数 int32 LE][校验][0x55]
+ *     共 30 字节，校验 = bytes[1..27] 累加。
  *
  * 职责:
  *   - 解析 0xBB 帧 -> v_linear/v_angular -> Chassis_SetTwist()
- *   - 周期发送 0xCC 帧 (x/y/theta 来自 Chassis_GetOdom())
+ *   - 周期发送 0xCD V2 帧（里程计 + MCU 时间戳 + 左右累计计数）
  */
 
 #ifndef CHASSIS_PROTOCOL_H
@@ -29,6 +30,7 @@ extern "C" {
 /* ======================== 协议常量 ======================== */
 #define HOST_HEAD_CMD    0xBBu    /* 上位机 -> F407 速度指令帧头 */
 #define HOST_HEAD_ODOM   0xCCu    /* F407 -> 上位机 里程计帧头 */
+#define HOST_HEAD_ODOM_V2 0xCDu   /* F407 -> 上位机 里程计 + 原始轮计数 */
 #define HOST_FOOTER      0x55u    /* 帧尾 */
 
 /* ======================== 接口 ======================== */
@@ -47,7 +49,7 @@ void UART_Host_Call_Back(uint8_t *Buffer, uint16_t Length);
 void Host_ApplyPendingCommand(void);
 
 /**
- * @brief  发送里程计 0xCC 帧 (放在 50Hz 定时任务里调用)
+ * @brief  发送里程计/轮计数 0xCD V2 帧 (放在 50Hz 定时任务里调用)
  */
 void Host_SendOdom(void);
 

@@ -135,26 +135,38 @@ int main(void)
 	  IMU_getYawPitchRoll(ypr);
 //	  debug_printf("\tangle:%.2f\t%.2f\t%.2f\r\n", ypr[0], ypr[1], ypr[2]);
 
-	  /* ============ 底盘调试: 按 USERKEY 循环切换七个模式 ============
+	  /* ============ 底盘调试: 按 USERKEY 循环切换八个模式 ============
 	     模式 0  标定显示 : 手推车看计数/轮速/距离/里程计
 	     模式 1  开环基准 : Load(-20,-20) 那个 PWM, 看 act 是多少
 	     模式 2  速度环   : 两轮闭环跑 0.2 m/s, 看 act 跟不跟得住 tgt
 	     模式 3  低速陀螺仪直行: 等效 Load(-20,-20)，但启用闭环纠偏
-	     模式 4  编码器自检: 期望约 100,100
+	     模式 4  编码器自检: 期望约 400,400（200 次翻转的边沿总数）
 	     模式 5  陀螺仪数据显示: gz 和修正量
 	     模式 6  角度锁定直行: 锁定启动 yaw，显示 T/N、E/C、act、pwm
+	     模式 7  编码器边沿诊断: 不动车，显示 ISR Hz / cnt / distance / odom
 	     模式 1/2/3/6 会动车；切走自动停车，直行效果在平地低速验证。
 	     ============================================================== */
 	  {
 		  static uint8_t mode = 0;
+		  uint8_t key_num = Key_GetNum();
 
-		  if (Key_GetNum() == USERKEY_SHORT) {
+		  /* 电机测试运行时长按：立即停车，回模式 0，并保留最终计数。
+		     其余页面长按：进入模式 7 并清零，供手推/编码器测试。 */
+		  if (key_num == USERKEY_LONG) {
+			  if ((mode == 1u) || (mode == 2u) || (mode == 3u) || (mode == 6u)) {
+				  Chassis_TestStop();
+				  mode = 0u;
+			  } else {
+				  mode = 7u;
+				  Chassis_DebugResetIsr();
+			  }
+		  } else if (key_num == USERKEY_SHORT) {
 			  /* 离开任何会转的模式前, 先停车 */
 			  if ((mode == 1u) || (mode == 2u) || (mode == 3u) || (mode == 6u)) {
 				  Chassis_TestStop();
 			  }
 
-			  mode = (uint8_t)((mode + 1u) % 7u);
+			  mode = (uint8_t)((mode + 1u) % 8u);
 
 			  if (mode == 1u) {
 				  Chassis_TestOpenLoopStart();   /* 开环 PWM=20 基准 */
@@ -166,6 +178,8 @@ int main(void)
 				  Chassis_SelfTest();            /* 编码器通路自检 */
 			  } else if (mode == 6u) {
 				  Chassis_TestAngleStraightStart();
+			  } else if (mode == 7u) {
+				  Chassis_DebugResetIsr();
 			  }
 		  }
 
@@ -183,6 +197,9 @@ int main(void)
 			  break;
 		  case 6u:
 			  Chassis_DebugDisplayAngleTest();
+			  break;
+		  case 7u:
+			  Chassis_DebugDisplayIsr();
 			  break;
 		  default:
 			  if (Chassis_IsAngleHoldEnabled() != 0u) {

@@ -57,8 +57,8 @@ static volatile uint32_t s_isr_edge_count[ENC_COUNT]; /* 诊断: A 相边沿总�
 static Encoder_t        s_enc[ENC_COUNT];
 
 static const float s_meters_per_count[ENC_COUNT] = {
-    ENC_METERS_PER_COUNT * ENC_LEFT_DISTANCE_SCALE,
-    ENC_METERS_PER_COUNT * ENC_RIGHT_DISTANCE_SCALE
+    ENC_LEFT_METERS_PER_COUNT,
+    ENC_RIGHT_METERS_PER_COUNT
 };
 
 /* ======================== 私有函数 ======================== */
@@ -75,7 +75,7 @@ static void Enc_TimerInit(void)
     ic.ICPolarity  = TIM_INPUTCHANNELPOLARITY_BOTHEDGE;  /* 上升沿 + 下降沿都捕获 */
     ic.ICSelection = TIM_ICSELECTION_DIRECTTI;           /* 直连 TI3 */
     ic.ICPrescaler = TIM_ICPSC_DIV1;                     /* 每个边沿都计数 */
-    ic.ICFilter    = 0x4;                                /* 滤除 4 个采样周期的毛刺 */
+    ic.ICFilter    = 0x8;                                /* 滤除更长的电机噪声毛刺 */
 
     for (i = 0; i < ENC_COUNT; i++) {
         htim_enc[i].Instance               = (TIM_TypeDef *)s_inst[i];
@@ -368,7 +368,7 @@ void Encoder_SetDirSign(EncoderID_t id, int8_t sign)
 float Encoder_GetMetersPerCount(EncoderID_t id)
 {
     if ((uint8_t)id >= ENC_COUNT) {
-        return ENC_METERS_PER_COUNT;
+        return ENC_LEFT_METERS_PER_COUNT;
     }
     return s_meters_per_count[id];
 }

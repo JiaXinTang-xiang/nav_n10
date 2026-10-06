@@ -104,9 +104,16 @@ static Chassis_Odom_t s_odom;
 
 static uint8_t s_speed_loop_en;   /* 0 = 开环 PWM 调试, 1 = 速度闭环 */
 
-/* 上电自检结果, 期望两路都约 +100 */
+/* 上电自检结果, 期望两路都约 400 个 A 相边沿 */
 static int32_t s_selftest_l;
 static int32_t s_selftest_r;
+
+/* 模式 7 的诊断窗口状态。放在函数外，便于进入模式或长按按键时清零。 */
+static uint32_t s_diag_last_tick;
+static int32_t  s_diag_hz_l;
+static int32_t  s_diag_hz_r;
+static int32_t  s_diag_acc_l;
+static int32_t  s_diag_acc_r;
 
 /* 闭环测试期间的 PWM 上限 (安全钳位)。
    实测 PWM 20 -> 261 mm/s, 所以 1 个 PWM ≈ 0.013 m/s,
@@ -325,6 +332,12 @@ void Chassis_Update(void)
                     + PID_calc(&s_pid[wheel], s_fdb_mps[wheel], target)
                     ;
             control = ClampF(control, -CHASSIS_PID_MAX_OUT, CHASSIS_PID_MAX_OUT);
+            /* 板上模式 2 只用于低速验收，落实 30 PWM 的安全钳位。
+               正式串口控制、模式 3/6 不受这个测试限值影响。 */
+            if (s_test_mode == 2u) {
+                control = ClampF(control, -(float)CHASSIS_TEST_PID_LIMIT,
+                                 (float)CHASSIS_TEST_PID_LIMIT);
+            }
             s_pid[wheel].out = control;
             out[wheel] = (int)control;
         }
@@ -726,34 +739,30 @@ void Chassis_DebugDisplaySelfTest(void)
  *         所以能把"信号问题"和"计数逻辑问题"分开:
  *
  *           轮子静止、电机断电     -> L/R 都应为 0
- *           手转轮子 1 圈/秒       -> 约 26 Hz (13线 x 2边沿)
+ *           手转轮子 1 圈/秒       -> 约 780 Hz (13线 x 2边沿 x 30减速比)
  *           "扭一下就上万" 时看这里 -> 若是几百 kHz, 是信号/中断问题;
  *                                     若只有几十 Hz, 是判方向/累加逻辑问题
  */
 void Chassis_DebugDisplayIsr(void)
 {
-    static uint32_t last_ms;
-    static int32_t  hz_l;
-    static int32_t  hz_r;
-    static int32_t  acc_l;
-    static int32_t  acc_r;
+    float theta_total_deg;
 
-    acc_l += Encoder_TakeIsrCount(ENC_LEFT);
-    acc_r += Encoder_TakeIsrCount(ENC_RIGHT);
+    s_diag_acc_l += Encoder_TakeIsrCount(ENC_LEFT);
+    s_diag_acc_r += Encoder_TakeIsrCount(ENC_RIGHT);
 
     /* nowtime 单位 100us, 5000 = 0.5 秒 */
-    if ((nowtime - last_ms) >= 5000u) {
-        hz_l    = acc_l * 2;   /* 0.5s 窗口 x2 = Hz */
-        hz_r    = acc_r * 2;
-        acc_l   = 0;
-        acc_r   = 0;
-        last_ms = nowtime;
+    if ((nowtime - s_diag_last_tick) >= 5000u) {
+        s_diag_hz_l     = s_diag_acc_l * 2;   /* 0.5s 窗口 x2 = Hz */
+        s_diag_hz_r     = s_diag_acc_r * 2;
+        s_diag_acc_l    = 0;
+        s_diag_acc_r    = 0;
+        s_diag_last_tick = nowtime;
     }
 
     OLED_operate_gram(PEN_CLEAR);
 
     OLED_show_string(1, 0, (uint8_t*)"ISR L,R :");
-    OLED_printf(1, 10, "%d,%d", (int)hz_l, (int)hz_r);
+    OLED_printf(1, 10, "%d,%d", (int)s_diag_hz_l, (int)s_diag_hz_r);
 
     OLED_show_string(2, 0, (uint8_t*)"cnt L,R :");
     OLED_printf(2, 10, "%d,%d", (int)Encoder_GetCount(ENC_LEFT),
@@ -764,10 +773,29 @@ void Chassis_DebugDisplayIsr(void)
                 (int)(Encoder_Get(ENC_LEFT)->distance_m * 1000.0f),
                 (int)(Encoder_Get(ENC_RIGHT)->distance_m * 1000.0f));
 
-    OLED_show_string(4, 0, (uint8_t*)"x,th x1e3:");
-    OLED_printf(4, 10, "%d,%d",
-                (int)(s_odom.x_m * 1000.0f),
-                (int)(s_odom.theta_rad * 1000.0f));
+    /* 从累计轮计数计算不回绕角度，供原地旋转多圈标定有效轮距。
+       s_odom.theta_rad 会限制在 +/-180 度，不能用于多圈标定。 */
+    theta_total_deg = (
+        (float)Encoder_GetCount(ENC_RIGHT) * Encoder_GetMetersPerCount(ENC_RIGHT)
+      - (float)Encoder_GetCount(ENC_LEFT)  * Encoder_GetMetersPerCount(ENC_LEFT))
+      / WHEEL_SEPARATION_M * 180.0f / CHASSIS_PI;
+
+    OLED_show_string(4, 0, (uint8_t*)"th deg  :");
+    OLED_printf(4, 10, "%d", (int)theta_total_deg);
 
     OLED_refresh_gram();
+}
+
+void Chassis_DebugResetIsr(void)
+{
+    Chassis_ResetOdom();
+    s_diag_last_tick = nowtime;
+    s_diag_hz_l      = 0;
+    s_diag_hz_r      = 0;
+    s_diag_acc_l     = 0;
+    s_diag_acc_r     = 0;
+
+    /* Encoder_Reset 已清零边沿计数；再取一次，避免以后实现变化留下旧样本。 */
+    (void)Encoder_TakeIsrCount(ENC_LEFT);
+    (void)Encoder_TakeIsrCount(ENC_RIGHT);
 }

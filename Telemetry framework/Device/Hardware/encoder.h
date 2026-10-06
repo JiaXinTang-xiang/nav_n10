@@ -46,18 +46,24 @@ extern "C" {
 
 #define WHEEL_DIAMETER_M     0.065f     /* 轮径 65 mm */
 #define WHEEL_RADIUS_M       0.0325f    /* 轮半径 */
-/* 轮距 = 两轮接触中心距。左轮外侧到右轮外侧 185 mm, 胎宽 27 mm => 158 mm
-   注意: 这个值直接决定原地旋转的角度精度, 上车前请实测复核 */
-#define WHEEL_SEPARATION_M   0.158f
+/* 几何中心轮距为 161 mm（188 mm 外侧总宽 - 27 mm 胎宽）。
+   实车原地旋转 360 度时，161 mm 参数只累计约 320 度，因此按
+   161 * 320 / 360 = 143.1 mm 修正为有效轮距。后续用顺/逆时针复测微调。 */
+#define WHEEL_SEPARATION_M   0.1431f
 
 /* ======================== 派生常量 ======================== */
 #define WHEEL_CIRCUMFERENCE_M  (3.14159265358979f * WHEEL_DIAMETER_M)
 #define ENC_COUNTS_PER_REV     (ENC_LINES_PER_REV * ENC_GEAR_RATIO * ENC_DECODE_FACTOR)
-#define ENC_METERS_PER_COUNT   (WHEEL_CIRCUMFERENCE_M / ENC_COUNTS_PER_REV)
 
-/* 左右轮有效滚动周长修正系数，按卷尺实测分别标定。 */
-#define ENC_LEFT_DISTANCE_SCALE   1.0000f
-#define ENC_RIGHT_DISTANCE_SCALE  1.0000f
+/* 2026-10-06 实测，每侧向前手转 10 圈并重复 3 次：
+   左: 7830, 7799, 7810 -> 781.3 count/圈
+   右: 7829, 7830, 7801 -> 782.0 count/圈
+   左右只差约 0.09%，说明捕获/解码一致；仍保留左右独立标定。 */
+#define ENC_LEFT_COUNTS_PER_WHEEL_REV   781.3f
+#define ENC_RIGHT_COUNTS_PER_WHEEL_REV  782.0f
+
+#define ENC_LEFT_METERS_PER_COUNT  (WHEEL_CIRCUMFERENCE_M / ENC_LEFT_COUNTS_PER_WHEEL_REV)
+#define ENC_RIGHT_METERS_PER_COUNT (WHEEL_CIRCUMFERENCE_M / ENC_RIGHT_COUNTS_PER_WHEEL_REV)
 
 /* ======================== 编码器编号 ======================== */
 typedef enum {

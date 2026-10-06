@@ -8,3 +8,7 @@ chassis_bridge:
     publish_tf: true
     command_rate_hz: 20.0         # 向 STM32 重发速度指令的频率
     command_timeout_sec: 0.5      # /cmd_vel 超时后自动停车
+    left_meters_per_count: 0.0002613638   # 65mm / 左轮实测 781.3 count/圈
+    right_meters_per_count: 0.0002611298  # 65mm / 右轮实测 782.0 count/圈
+    wheel_separation: 0.1431      # 实车360度只报约320度后的有效轮距
+    integrate_odom_from_wheel_counts: true

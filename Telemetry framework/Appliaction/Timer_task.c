@@ -45,7 +45,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 		{
 			count2=0;
 			LED1_toggle();
-			Host_SendOdom();	// 每 20ms 发一帧 0xCC 里程计给上位机
+			Host_SendOdom();	// 每 20ms 发一帧 0xCD V2 里程计/轮计数给上位机
 		}
     }
 }

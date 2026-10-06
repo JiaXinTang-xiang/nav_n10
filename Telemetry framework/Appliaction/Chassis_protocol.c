@@ -1,12 +1,11 @@
 /**
  * @file    Chassis_protocol.c
- * @brief   底盘串口协议实现 (0xBB 收指令 / 0xCC 发里程计)
+ * @brief   底盘串口协议实现 (0xBB 收指令 / 0xCD 发里程计与轮计数)
  *
  * 字节序说明:
  *   - 0xBB 帧的 v_linear / v_angular 是 int16 大端(高位在前), 对应
  *     chassis_bridge.py 里手工拼的 buf[1]=hi, buf[2]=lo。
- *   - 0xCC 帧的 x/y/theta 是 float32 小端, 对应 Python 的 struct '<fff'。
- *     STM32F407 是小端, 直接 memcpy 一个 float 就是小端字节序。
+ *   - 0xCD V2 帧全部使用小端，对应 Python 的 '<BHIfffii'。
  */
 
 #include "Chassis_protocol.h"
@@ -40,7 +39,11 @@ static uint8_t  s_host_ever_got_cmd = 0u;  /* 是否收到过至少一条指令 
 static uint8_t  s_host_stopped      = 0u;  /* 是否已因超时停车(只停一次) */
 
 /* 里程计帧缓冲 (static: DMA 发送是异步的, 局部变量会失效) */
-static uint8_t s_odom_buf[15];
+static uint8_t s_odom_buf[30];
+static uint16_t s_odom_sequence;
+
+/* TIM6 单调时基，单位 100 us。 */
+extern volatile uint32_t nowtime;
 
 /* ======================== 私有函数 ======================== */
 
@@ -131,6 +134,9 @@ void Host_ApplyPendingCommand(void)
 void Host_SendOdom(void)
 {
     const Chassis_Odom_t *od = Chassis_GetOdom();
+    uint32_t sample_tick;
+    int32_t left_count;
+    int32_t right_count;
     float x_mm;
     float y_mm;
     float theta_rad;
@@ -145,17 +151,27 @@ void Host_SendOdom(void)
     y_mm      = od->y_m * 1000.0f;      /* m -> mm */
     theta_rad = od->theta_rad;          /* 本来就是弧度 */
 
-    s_odom_buf[0] = HOST_HEAD_ODOM;
-    memcpy(&s_odom_buf[1],  &x_mm,      4);   /* float 小端 */
-    memcpy(&s_odom_buf[5],  &y_mm,      4);
-    memcpy(&s_odom_buf[9],  &theta_rad, 4);
+    sample_tick = nowtime;
+    left_count = Encoder_GetCount(ENC_LEFT);
+    right_count = Encoder_GetCount(ENC_RIGHT);
+
+    s_odom_buf[0] = HOST_HEAD_ODOM_V2;
+    s_odom_buf[1] = 1u;                         /* 协议版本 */
+    memcpy(&s_odom_buf[2],  &s_odom_sequence, 2);
+    memcpy(&s_odom_buf[4],  &sample_tick,     4);
+    memcpy(&s_odom_buf[8],  &x_mm,            4);
+    memcpy(&s_odom_buf[12], &y_mm,            4);
+    memcpy(&s_odom_buf[16], &theta_rad,       4);
+    memcpy(&s_odom_buf[20], &left_count,      4);
+    memcpy(&s_odom_buf[24], &right_count,     4);
 
     cksum = 0u;
-    for (i = 1u; i <= 12u; i++) {
+    for (i = 1u; i <= 27u; i++) {
         cksum += s_odom_buf[i];
     }
-    s_odom_buf[13] = cksum;
-    s_odom_buf[14] = HOST_FOOTER;
+    s_odom_buf[28] = cksum;
+    s_odom_buf[29] = HOST_FOOTER;
 
-    UART_Send_Data(&huart2, s_odom_buf, 15u);
+    UART_Send_Data(&huart2, s_odom_buf, 30u);
+    s_odom_sequence++;
 }
