@@ -66,6 +66,7 @@ pkill -9 -f behavior_server               2>/dev/null
 pkill -9 -f bt_navigator                  2>/dev/null
 pkill -9 -f lifecycle_manager             2>/dev/null
 pkill -9 -f velocity_smoother             2>/dev/null
+pkill -9 -f start_cartographer_localization 2>/dev/null
 sleep 2
 ros2 daemon stop >/dev/null 2>&1 || true
 ros2 daemon start >/dev/null 2>&1 || true
@@ -96,7 +97,8 @@ nohup ros2 run cartographer_ros cartographer_node \
 sleep 3
 
 echo "=== [5/5] 占据栅格地图 ==="
-nohup ros2 run cartographer_ros cartographer_occupancy_grid_node --ros-args -p resolution:=0.05 > /tmp/occgrid.log 2>&1 &
+nohup ros2 run cartographer_ros cartographer_occupancy_grid_node --ros-args \
+  -p resolution:=0.05 -p publish_period_sec:=5.0 > /tmp/occgrid.log 2>&1 &
 sleep 4
 
 echo

@@ -234,8 +234,9 @@ namespace lslidar_driver
 		}
 		RCLCPP_INFO_STREAM(this->get_logger(), "Lidar is " << lidar_name.c_str());
 
-		if (pubScan)
-			scan_pub = this->create_publisher<sensor_msgs::msg::LaserScan>(scan_topic, 10);
+			if (pubScan)
+				scan_pub = this->create_publisher<sensor_msgs::msg::LaserScan>(
+					scan_topic, rclcpp::SensorDataQoS().keep_last(1));
 		if (pubPointCloud2)
 			point_cloud_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>(pointcloud_topic, 10);
 		difop_switch = this->create_subscription<std_msgs::msg::Int8>("lslidar_order", 1, std::bind(&LslidarDriver::lidar_order, this, std::placeholders::_1)); // 转速输入

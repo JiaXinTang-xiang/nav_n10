@@ -9,16 +9,11 @@ wheeltec 导航系统一键启动
 
 import os
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, EmitEvent, RegisterEventHandler
+from launch.actions import DeclareLaunchArgument
 from launch.conditions import IfCondition
-from launch.event_handlers import OnProcessExit
-from launch.events import Shutdown
 from launch.substitutions import LaunchConfiguration
-from launch_ros.actions import Node, LifecycleNode
-from launch_ros.events.lifecycle import ChangeState
+from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
-
-import lifecycle_msgs.msg
 
 
 def generate_launch_description():
@@ -27,6 +22,8 @@ def generate_launch_description():
     lidar_pkg = get_package_share_directory('lslidar_driver')
     imu_pkg = get_package_share_directory('anorosdt2')
     nav2_params = os.path.join(nav2_pkg, 'config', 'nav2_params.yaml')
+    safe_navigation_tree = os.path.join(
+        nav2_pkg, 'config', 'navigate_to_pose_safe.xml')
 
     # ── 参数 ──
     map_arg = DeclareLaunchArgument(
@@ -40,7 +37,7 @@ def generate_launch_description():
     autostart = 'true'
 
     # ── 雷达 ──
-    lidar_node = LifecycleNode(
+    lidar_node = Node(
         package='lslidar_driver', executable='lslidar_driver_node',
         name='lslidar_driver_node', namespace='', output='screen', emulate_tty=True,
         parameters=[os.path.join(lidar_pkg, 'params', 'lidar_uart_ros2', 'lsn10.yaml'),
@@ -89,11 +86,12 @@ def generate_launch_description():
         parameters=[nav2_params], output='screen',
         remappings=[('scan', '/scan')])
 
-    # ── Nav2 生命周期节点 ──
-    lifecycle_nodes = [
-        'lslidar_driver_node',
+    # 定位先启动；其余导航节点在 AMCL 首次定位后自动激活。
+    localization_nodes = [
         'map_server',
         'amcl',
+    ]
+    navigation_nodes = [
         'controller_server',
         'planner_server',
         'behavior_server',
@@ -101,21 +99,32 @@ def generate_launch_description():
         'velocity_smoother',
     ]
 
-    # 生命周期管理器
-    lifecycle_manager = Node(
+    localization_manager = Node(
+        package='nav2_lifecycle_manager', executable='lifecycle_manager',
+        name='lifecycle_manager_localization',
+        output='screen',
+        parameters=[{'use_sim_time': False,
+                     'autostart': True,
+                     'node_names': localization_nodes}])
+
+    navigation_manager = Node(
         package='nav2_lifecycle_manager', executable='lifecycle_manager',
         name='lifecycle_manager_navigation',
         output='screen',
         parameters=[{'use_sim_time': False,
-                     'autostart': True,
-                     'node_names': lifecycle_nodes}])
+                     'autostart': False,
+                     'node_names': navigation_nodes}])
+
+    navigation_autostarter = Node(
+        package='wheeltec_nav2', executable='navigation_autostarter.py',
+        name='navigation_autostarter', output='screen')
 
     # 各 Nav2 组件
     controller_server = Node(
         package='nav2_controller', executable='controller_server',
         name='controller_server', output='screen',
         parameters=[nav2_params],
-        remappings=[('cmd_vel', '/cmd_vel')])
+        remappings=[('cmd_vel', '/cmd_vel_nav')])
 
     planner_server = Node(
         package='nav2_planner', executable='planner_server',
@@ -130,7 +139,9 @@ def generate_launch_description():
     bt_navigator = Node(
         package='nav2_bt_navigator', executable='bt_navigator',
         name='bt_navigator', output='screen',
-        parameters=[nav2_params])
+        parameters=[nav2_params, {
+            'default_nav_to_pose_bt_xml': safe_navigation_tree,
+        }])
 
     velocity_smoother = Node(
         package='nav2_velocity_smoother', executable='velocity_smoother',
@@ -159,6 +170,8 @@ def generate_launch_description():
         behavior_server,
         bt_navigator,
         velocity_smoother,
-        lifecycle_manager,
+        localization_manager,
+        navigation_manager,
+        navigation_autostarter,
         rviz_node,
     ])

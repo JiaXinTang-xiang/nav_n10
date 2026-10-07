@@ -7,4 +7,10 @@ install(DIRECTORY config launch
   DESTINATION share/${PROJECT_NAME}
 )
 
+install(PROGRAMS
+  scripts/navigation_autostarter.py
+  scripts/start_cartographer_localization.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 ament_package()

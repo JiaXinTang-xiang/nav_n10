@@ -1,72 +1,98 @@
 #!/usr/bin/env bash
-# nav2_bringup.sh — 导航栈一键启动（AMCL 定位 + Nav2）
-# 用法: bash ~/Desktop/nav_n10/nav2_bringup.sh [地图yaml路径，默认 ~/map.yaml]
+# Jetson 导航一键启动：清理旧进程后启动雷达、IMU、底盘、AMCL 和 Nav2。
+
+set -eo pipefail
 
 WS="${HOME}/Desktop/nav_n10"
-MAP="${1:-${HOME}/map.yaml}"
-PARAMS="${WS}/ros2_ws/src/wheeltec_nav2/config/nav2_params.yaml"
-URDF='<?xml version="1.0"?><robot name="lsn10_robot"><link name="base_link"/><link name="imu_link"/><link name="laser"/><joint name="imu_joint" type="fixed"><parent link="base_link"/><child link="imu_link"/><origin xyz="0 0 0.05" rpy="0 0 0"/></joint><joint name="laser_joint" type="fixed"><parent link="base_link"/><child link="laser"/><origin xyz="0 0 0.1" rpy="0 0 0"/></joint></robot>'
+MAP="${1:-${WS}/maps/map_20261006_231058.yaml}"
+
+if [ ! -f "${WS}/ros2_ws/install/setup.bash" ]; then
+  echo "❌ ROS2 工作空间未编译: ${WS}/ros2_ws/install/setup.bash"
+  exit 1
+fi
+
+if [ ! -f "${MAP}" ]; then
+  echo "❌ 地图不存在: ${MAP}"
+  exit 1
+fi
+
+for device in /dev/lidar /dev/imu /dev/chassis; do
+  if [ ! -e "${device}" ]; then
+    echo "❌ 缺少设备 ${device}"
+    exit 1
+  fi
+done
+
+source /opt/ros/humble/setup.bash
+source "${WS}/ros2_ws/install/setup.bash"
 
 export ROS_DOMAIN_ID=0
 export ROS_LOCALHOST_ONLY=0
 export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 export CYCLONEDDS_URI="file://${WS}/cyclonedds/cyclonedds-jetson.xml"
-source /opt/ros/humble/setup.bash
-source "${WS}/ros2_ws/install/setup.bash"
 
-echo "=== [1/4] 清理旧进程(含 Cartographer，导航改用 AMCL) ==="
-pkill -9 -f chassis_bridge 2>/dev/null
-pkill -9 -f anoros_dt 2>/dev/null
-pkill -9 -f lslidar_driver_node 2>/dev/null
-pkill -9 -f robot_state_publisher 2>/dev/null
-pkill -9 -f cartographer_node 2>/dev/null
-pkill -9 -f cartographer_occupancy_grid_node 2>/dev/null
-pkill -9 -f map_server 2>/dev/null
-pkill -9 -f amcl 2>/dev/null
-pkill -9 -f controller_server 2>/dev/null
-pkill -9 -f planner_server 2>/dev/null
-pkill -9 -f behavior_server 2>/dev/null
-pkill -9 -f bt_navigator 2>/dev/null
-pkill -9 -f velocity_smoother 2>/dev/null
-pkill -9 -f lifecycle_manager 2>/dev/null
+echo "=== 清理旧 SLAM、导航和串口节点 ==="
+pkill -TERM -f "ros2 launch wheeltec_nav2 navigation.launch.py" 2>/dev/null || true
+pkill -TERM -f "ros2 launch.*cartographer" 2>/dev/null || true
 sleep 2
+
+for pattern in \
+  cartographer_node \
+  cartographer_occupancy_grid_node \
+  lslidar_driver_node \
+  anoros_dt \
+  chassis_bridge \
+  robot_state_publisher \
+  map_server \
+  amcl \
+  controller_server \
+  planner_server \
+  behavior_server \
+  bt_navigator \
+  velocity_smoother \
+  navigation_autostarter \
+  lifecycle_manager; do
+  pkill -TERM -f "${pattern}" 2>/dev/null || true
+done
+
+sleep 1
+
+for pattern in \
+  cartographer_node \
+  cartographer_occupancy_grid_node \
+  lslidar_driver_node \
+  anoros_dt \
+  chassis_bridge \
+  robot_state_publisher \
+  map_server \
+  amcl \
+  controller_server \
+  planner_server \
+  behavior_server \
+  bt_navigator \
+  velocity_smoother \
+  navigation_autostarter \
+  lifecycle_manager; do
+  pkill -KILL -f "${pattern}" 2>/dev/null || true
+done
+
+for device in /dev/lidar /dev/imu /dev/chassis; do
+  fuser -k "${device}" >/dev/null 2>&1 || true
+done
+
 ros2 daemon stop >/dev/null 2>&1 || true
 ros2 daemon start >/dev/null 2>&1 || true
 
-echo "=== [2/4] 数据节点(底盘/雷达/URDF) ==="
-nohup ros2 run wheeltec_chassis chassis_bridge --ros-args \
-  --params-file "${WS}/ros2_ws/src/wheeltec_chassis/config/chassis.yaml" > /tmp/chassis.log 2>&1 &
-nohup ros2 run lslidar_driver lslidar_driver_node --ros-args \
-  --params-file "${WS}/ros2_ws/src/lslidar_driver/params/lidar_uart_ros2/lsn10.yaml" > /tmp/lidar.log 2>&1 &
-nohup ros2 run robot_state_publisher robot_state_publisher --ros-args \
-  -p robot_description:="${URDF}" > /tmp/rsp.log 2>&1 &
-sleep 3
+echo "=== 串口 ==="
+for device in /dev/lidar /dev/imu /dev/chassis; do
+  echo "${device} -> $(readlink -f "${device}")"
+done
 
-echo "=== [3/4] Nav2 生命周期节点 ==="
-nohup ros2 run nav2_map_server map_server --ros-args \
-  --params-file "${PARAMS}" -p yaml_filename:="${MAP}" > /tmp/map_server.log 2>&1 &
-nohup ros2 run nav2_amcl amcl --ros-args \
-  --params-file "${PARAMS}" > /tmp/amcl.log 2>&1 &
-nohup ros2 run nav2_controller controller_server --ros-args \
-  --params-file "${PARAMS}" > /tmp/controller.log 2>&1 &
-nohup ros2 run nav2_planner planner_server --ros-args \
-  --params-file "${PARAMS}" > /tmp/planner.log 2>&1 &
-nohup ros2 run nav2_behaviors behavior_server --ros-args \
-  --params-file "${PARAMS}" > /tmp/behavior.log 2>&1 &
-nohup ros2 run nav2_bt_navigator bt_navigator --ros-args \
-  --params-file "${PARAMS}" > /tmp/bt.log 2>&1 &
-sleep 2
+echo "=== 启动导航 ==="
+echo "地图: ${MAP}"
+echo "启动后在 PC RViz 使用 2D Pose Estimate 设置初始位置。"
+echo "AMCL 收到初始位姿后，脚本会自动激活其余 Nav2 节点。"
 
-echo "=== [4/4] lifecycle_manager 配置+激活 ==="
-nohup ros2 run nav2_lifecycle_manager lifecycle_manager --ros-args \
-  -p "node_names:=['map_server','amcl','controller_server','planner_server','behavior_server','bt_navigator']" \
-  -p autostart:=true > /tmp/lifecycle.log 2>&1 &
-sleep 6
-
-echo
-echo "=== 节点 ==="
-ros2 node list 2>&1
-echo "=== 话题 ==="
-ros2 topic list 2>&1 | grep -E "map|amcl|cmd_vel|plan|scan|odom|costmap"
-echo
-echo "✅ 导航栈已启动。PC 上开 RViz：先 2D Pose Estimate 给初始位姿，再 2D Nav Goal 给目标点。"
+exec ros2 launch wheeltec_nav2 navigation.launch.py \
+  map:="${MAP}" \
+  rviz:=false
