@@ -1,11 +1,12 @@
-<!-- Follow the path and stop at the goal position. Final IMU rotation is tested explicitly via /spin. -->
+<!-- Follow the path, then finish the goal orientation with IMU feedback. -->
 <root main_tree_to_execute="MainTree">
   <BehaviorTree ID="MainTree">
-    <PipelineSequence name="NavigateToPositionOnly">
+    <PipelineSequence name="NavigateWithImuHeading">
       <RateController hz="1.0">
         <ComputePathToPose goal="{goal}" path="{path}" planner_id="GridBased"/>
       </RateController>
       <FollowPath path="{path}" controller_id="FollowPath"/>
+      <FinalImuSpin goal="{goal}" time_allowance="15.0"/>
     </PipelineSequence>
   </BehaviorTree>
 </root>

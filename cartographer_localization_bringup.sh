@@ -36,12 +36,21 @@ for i in $(seq 1 5); do
 done
 for pattern in \
   cartographer_node cartographer_occupancy_grid_node \
+  start_cartographer_localization \
   lslidar_driver_node anoros_dt chassis_bridge robot_state_publisher \
   map_server amcl controller_server planner_server behavior_server \
   bt_navigator velocity_smoother navigation_autostarter lifecycle_manager; do
   pkill -TERM -f "${pattern}" 2>/dev/null || true
 done
 sleep 2
+for pattern in \
+  cartographer_node cartographer_occupancy_grid_node \
+  start_cartographer_localization \
+  lslidar_driver_node anoros_dt chassis_bridge robot_state_publisher \
+  map_server amcl controller_server planner_server behavior_server \
+  bt_navigator velocity_smoother navigation_autostarter lifecycle_manager; do
+  pkill -KILL -f "${pattern}" 2>/dev/null || true
+done
 
 CONFIG_DIR="${WS}/ros2_ws/install/lslidar_driver/share/lslidar_driver/config"
 

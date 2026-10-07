@@ -1,0 +1,7 @@
+<class_libraries>
+  <library path="wheeltec_imu_spin_behavior">
+    <class name="wheeltec_nav2/ImuSpin" type="wheeltec_nav2::ImuSpin" base_class_type="nav2_core::Behavior">
+      <description>IMU feedback closed-loop in-place rotation</description>
+    </class>
+  </library>
+</class_libraries>

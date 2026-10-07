@@ -1,0 +1,3 @@
+<library path="wheeltec_nav2_bt_nodes">
+  <class name="wheeltec_nav2::FinalImuSpinAction" type="wheeltec_nav2::FinalImuSpinAction"/>
+</library>
