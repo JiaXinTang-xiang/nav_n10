@@ -1153,9 +1153,9 @@ namespace lslidar_driver
 
 					if (clockwise_full_scan)
 					{
-						scan->angle_min = 0.0;
-						scan->angle_max = -2 * M_PI;
-						scan->angle_increment = -2 * M_PI / (double)(count_num - 1);
+						scan->angle_min = -M_PI;
+						scan->angle_max = M_PI;
+						scan->angle_increment = 2 * M_PI / (double)(count_num - 1);
 					}
 					else if (angle_able_max > 360)
 					{
@@ -1186,7 +1186,15 @@ namespace lslidar_driver
 					{
 						int point_idx;
 						if (clockwise_full_scan)
-							point_idx = round(points[i].degree * (count_num - 1) / 360);
+						{
+							double angle = -points[i].degree * M_PI / 180.0;
+							while (angle < -M_PI)
+								angle += 2 * M_PI;
+							while (angle >= M_PI)
+								angle -= 2 * M_PI;
+							point_idx = round((angle + M_PI) *
+								(count_num - 1) / (2 * M_PI));
+						}
 						else
 						{
 							point_idx = round((360 - points[i].degree) * count_num / 360);

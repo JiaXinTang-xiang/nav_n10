@@ -18,11 +18,8 @@ def wrap_angle(angle):
     return math.atan2(math.sin(angle), math.cos(angle))
 
 
-def yaw_from_quaternion(quaternion):
-    return math.atan2(
-        2.0 * (quaternion.w * quaternion.z + quaternion.x * quaternion.y),
-        1.0 - 2.0 * (quaternion.y * quaternion.y + quaternion.z * quaternion.z),
-    )
+# 飞控四元数实测冻结(恒 1,0,0,0)，只有 gyro_z 是活的。
+# 航向统一改用 gyro_z 积分，与 chassis_bridge 的 imu_force_gyro_yaw 口径一致。
 
 
 class ImuSpinController(Node):
@@ -38,7 +35,9 @@ class ImuSpinController(Node):
         self.declare_parameter('kp', 1.8)
         self.declare_parameter('slow_down_angle', 0.45)
         self.declare_parameter('angle_tolerance', 0.045)
-        self.declare_parameter('imu_timeout_sec', 0.25)
+        self.declare_parameter('imu_timeout_sec', 1.0)
+        self.declare_parameter('imu_yaw_sign', 1.0)
+        self.declare_parameter('imu_gyro_deadband_rad_s', 0.03)
         self.declare_parameter('control_rate_hz', 30.0)
         self.declare_parameter('pulse_period_sec', 0.24)
         self.declare_parameter('pulse_on_sec', 0.08)
@@ -49,6 +48,8 @@ class ImuSpinController(Node):
         self.slow_down_angle = float(self.get_parameter('slow_down_angle').value)
         self.angle_tolerance = float(self.get_parameter('angle_tolerance').value)
         self.imu_timeout_sec = float(self.get_parameter('imu_timeout_sec').value)
+        self.yaw_sign = float(self.get_parameter('imu_yaw_sign').value)
+        self.gyro_deadband = float(self.get_parameter('imu_gyro_deadband_rad_s').value)
         control_rate = float(self.get_parameter('control_rate_hz').value)
         self.pulse_period = float(self.get_parameter('pulse_period_sec').value)
         self.pulse_on = float(self.get_parameter('pulse_on_sec').value)
@@ -59,6 +60,10 @@ class ImuSpinController(Node):
             raise ValueError('min_angular_speed must be positive and <= max_angular_speed')
         if self.kp <= 0.0 or self.angle_tolerance <= 0.0:
             raise ValueError('kp and angle_tolerance must be positive')
+        if self.yaw_sign == 0.0:
+            raise ValueError('imu_yaw_sign must not be zero')
+        if self.gyro_deadband < 0.0:
+            raise ValueError('imu_gyro_deadband_rad_s must not be negative')
         if self.pulse_period <= 0.0 or not 0.0 < self.pulse_on <= self.pulse_period:
             raise ValueError('pulse_on_sec must be within pulse_period_sec')
 
@@ -80,22 +85,25 @@ class ImuSpinController(Node):
         self.imu_lock = threading.Lock()
         self.current_yaw = None
         self.unwrapped_yaw = None
-        self.last_imu_yaw = None
         self.last_imu_time = None
         self.get_logger().info(
-            f'IMU闭环转弯已启动: min={self.min_speed:.2f} rad/s, '
-            f'max={self.max_speed:.2f} rad/s, tolerance={self.angle_tolerance:.3f} rad')
+            f'IMU闭环转弯已启动(gyro_z积分): min={self.min_speed:.2f} rad/s, '
+            f'max={self.max_speed:.2f} rad/s, tolerance={self.angle_tolerance:.3f} rad, '
+            f'yaw_sign={self.yaw_sign}, deadband={self.gyro_deadband} rad/s')
 
     def imu_callback(self, message):
-        yaw = yaw_from_quaternion(message.orientation)
+        """gyro_z 积分航向（飞控四元数冻结，不可用）"""
+        wz = message.angular_velocity.z * self.yaw_sign
         now = time.monotonic()
         with self.imu_lock:
-            if self.last_imu_yaw is None:
-                self.unwrapped_yaw = yaw
+            if self.last_imu_time is None:
+                self.unwrapped_yaw = 0.0
             else:
-                self.unwrapped_yaw += wrap_angle(yaw - self.last_imu_yaw)
+                dt = now - self.last_imu_time
+                # 单帧积分限幅 0.2s，防止偶发大间隔用旧 wz 积分出假角度
+                if 0.0 < dt <= 0.2 and abs(wz) >= self.gyro_deadband:
+                    self.unwrapped_yaw += wz * dt
             self.current_yaw = self.unwrapped_yaw
-            self.last_imu_yaw = yaw
             self.last_imu_time = now
 
     def goal_callback(self, _goal_request):

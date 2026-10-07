@@ -93,7 +93,7 @@ controller_server:
     FollowPath:
       plugin: "dwb_core::DWBLocalPlanner"
       debug_trajectory_details: true
-      min_vel_x: -0.15              # 允许低速倒退
+      min_vel_x: 0.0                # 路径跟踪只前进，避免原地附近倒车绕圈
       max_vel_x: 0.15               # 建图后首次导航先限制为 0.15 m/s
       max_vel_y: 0.0                # 不能侧移
       min_vel_y: 0.0
@@ -117,17 +117,14 @@ controller_server:
       rot_stopped_velocity: 0.01
       short_circuit_trajectory_evaluation: true
       stateful: true
-      critics: ["RotateToGoal", "Oscillation", "BaseObstacle", "GoalAlign", "PathAlign", "PathDist", "GoalDist"]
+      # 导航只跟踪位置和路径。最终朝向交给 IMU 闭环转向，
+      # 否则 RotateToGoal/GoalAlign 会在 0.6 rad/s 的电机起转门槛下反复过冲。
+      critics: ["Oscillation", "BaseObstacle", "PathAlign", "PathDist", "GoalDist"]
       BaseObstacle.scale: 0.02
       PathAlign.scale: 32.0
       PathAlign.forward_point_distance: 0.1
-      GoalAlign.scale: 24.0
-      GoalAlign.forward_point_distance: 0.1
       PathDist.scale: 32.0
       GoalDist.scale: 24.0
-      RotateToGoal.scale: 32.0
-      RotateToGoal.slowing_factor: 5.0
-      RotateToGoal.lookahead_time: -1.0
 
 planner_server:
   ros__parameters:
@@ -261,7 +258,7 @@ velocity_smoother:
     scale_velocities: false
     feedback: "OPEN_LOOP"
     max_velocity: [0.15, 0.0, 0.80]
-    min_velocity: [-0.15, 0.0, -0.80]
+    min_velocity: [0.0, 0.0, -0.80]
     max_accel: [0.4, 0.0, 1.5]
     max_decel: [-0.4, 0.0, -1.5]
     odom_topic: "/odom"
