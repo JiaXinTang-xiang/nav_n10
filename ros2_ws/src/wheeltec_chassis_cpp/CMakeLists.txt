@@ -14,6 +14,7 @@ find_package(std_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 
 add_executable(chassis_bridge_cpp src/chassis_bridge.cpp)
+target_include_directories(chassis_bridge_cpp PRIVATE include)
 ament_target_dependencies(chassis_bridge_cpp
   rclcpp geometry_msgs nav_msgs sensor_msgs std_msgs tf2_ros)
 
@@ -23,5 +24,7 @@ install(DIRECTORY config
   DESTINATION share/${PROJECT_NAME})
 install(FILES package.xml
   DESTINATION share/${PROJECT_NAME})
+install(DIRECTORY include/ DESTINATION include)
+ament_export_include_directories(include)
 
 ament_package()

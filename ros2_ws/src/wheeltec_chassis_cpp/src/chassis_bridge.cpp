@@ -18,6 +18,7 @@
 #include "sensor_msgs/msg/imu.hpp"
 #include "std_msgs/msg/int64_multi_array.hpp"
 #include "tf2_ros/transform_broadcaster.h"
+#include "wheeltec_chassis_cpp/gyro_yaw.hpp"
 
 namespace wheeltec_chassis_cpp
 {
@@ -62,12 +63,8 @@ public:
     last_tick_(0),
     last_left_count_(0),
     last_right_count_(0),
-    last_imu_yaw_(0.0),
-    imu_unwrapped_yaw_(0.0),
-    have_imu_(false),
     imu_odom_offset_(0.0),
     have_imu_offset_(false),
-    last_imu_time_(0, 0, RCL_ROS_TIME),
     target_linear_(0.0),
     target_angular_(0.0),
     have_command_(false),
@@ -93,10 +90,23 @@ public:
     imu_force_gyro_yaw_ = declare_parameter<bool>("imu_force_gyro_yaw", true);
     imu_gyro_deadband_ = declare_parameter<double>("imu_gyro_deadband_rad_s", 0.03);
 
+    if (!imu_force_gyro_yaw_) {
+      throw std::invalid_argument("Only timestamped gyro yaw is supported; set imu_force_gyro_yaw=true");
+    }
+
+    for (const double value : {serial_poll_rate_hz_, command_rate_hz_, command_timeout_sec_,
+        left_meters_per_count_, right_meters_per_count_, wheel_separation_,
+        imu_timeout_sec_, imu_max_delta_rad_, imu_yaw_sign_, imu_gyro_deadband_})
+    {
+      if (!std::isfinite(value)) {
+        throw std::invalid_argument("non-finite chassis bridge parameter");
+      }
+    }
     if (serial_poll_rate_hz_ <= 0.0 || command_rate_hz_ <= 0.0 ||
       command_timeout_sec_ <= 0.0 || left_meters_per_count_ <= 0.0 ||
       right_meters_per_count_ <= 0.0 || wheel_separation_ <= 0.0 ||
-      imu_timeout_sec_ <= 0.0 || imu_max_delta_rad_ <= 0.0 || imu_yaw_sign_ == 0.0)
+      imu_timeout_sec_ <= 0.0 || imu_max_delta_rad_ <= 0.0 ||
+      std::abs(imu_yaw_sign_) != 1.0 || imu_gyro_deadband_ < 0.0)
     {
       throw std::invalid_argument("invalid chassis bridge parameter");
     }
@@ -209,37 +219,15 @@ private:
 
   void imu_callback(const sensor_msgs::msg::Imu::SharedPtr msg)
   {
-    const auto & q = msg->orientation;
-    const double norm = std::sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w);
-    if (norm < 0.5) {
-      return;
-    }
-    double yaw = std::atan2(
-      2.0 * (q.w * q.z + q.x * q.y),
-      1.0 - 2.0 * (q.y * q.y + q.z * q.z));
-    yaw *= imu_yaw_sign_;
-    const rclcpp::Time now = get_clock()->now();
-    if (!have_imu_) {
-      last_imu_yaw_ = yaw;
-      imu_unwrapped_yaw_ = yaw;
-      last_imu_time_ = now;
-      have_imu_ = true;
-      return;
-    }
-
-    const double dt = (now - last_imu_time_).seconds();
-    const double quaternion_delta = normalize_angle(yaw - last_imu_yaw_);
-    const double gyro_z = msg->angular_velocity.z * imu_yaw_sign_;
-    const double gyro_delta = std::abs(gyro_z) >= imu_gyro_deadband_ ? gyro_z * dt : 0.0;
-    const double delta = imu_force_gyro_yaw_ ? gyro_delta : quaternion_delta;
-    if (dt > 0.0 && dt <= imu_timeout_sec_ && std::abs(delta) <= imu_max_delta_rad_) {
-      imu_unwrapped_yaw_ += delta;
-    } else {
-      imu_unwrapped_yaw_ = yaw;
+    const auto generation = gyro_yaw_.generation();
+    gyro_yaw_.update(
+      static_cast<int64_t>(msg->header.stamp.sec) * 1000000000LL + msg->header.stamp.nanosec,
+      get_clock()->now().nanoseconds(),
+      msg->angular_velocity.z, imu_yaw_sign_, imu_gyro_deadband_,
+      imu_timeout_sec_, imu_max_delta_rad_);
+    if (generation != gyro_yaw_.generation()) {
       have_imu_offset_ = false;
     }
-    last_imu_yaw_ = yaw;
-    last_imu_time_ = now;
   }
 
   void decode_odom(uint8_t header)
@@ -286,14 +274,14 @@ private:
           const double wheel_dtheta = (dr - dl) / wheel_separation_;
           double dtheta = wheel_dtheta;
           const rclcpp::Time now = get_clock()->now();
-          const bool imu_fresh = use_imu_yaw_ && have_imu_ &&
-            (now - last_imu_time_).seconds() <= imu_timeout_sec_;
+          const bool imu_fresh = use_imu_yaw_ &&
+            gyro_yaw_.fresh(now.nanoseconds(), imu_timeout_sec_);
           if (imu_fresh) {
             if (!have_imu_offset_) {
-              imu_odom_offset_ = odom_theta_ - imu_unwrapped_yaw_;
+              imu_odom_offset_ = odom_theta_ - gyro_yaw_.yaw();
               have_imu_offset_ = true;
             }
-            const double imu_theta = normalize_angle(imu_unwrapped_yaw_ + imu_odom_offset_);
+            const double imu_theta = normalize_angle(gyro_yaw_.yaw() + imu_odom_offset_);
             dtheta = normalize_angle(imu_theta - odom_theta_);
           } else {
             have_imu_offset_ = false;
@@ -427,12 +415,9 @@ private:
   int32_t last_left_count_;
   int32_t last_right_count_;
 
-  double last_imu_yaw_;
-  double imu_unwrapped_yaw_;
-  bool have_imu_;
+  GyroYaw gyro_yaw_;
   double imu_odom_offset_;
   bool have_imu_offset_;
-  rclcpp::Time last_imu_time_;
 
   double target_linear_;
   double target_angular_;

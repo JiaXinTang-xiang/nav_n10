@@ -7,6 +7,7 @@
   <maintainer email="wheeltec@example.com">wheeltec</maintainer>
   <license>Apache-2.0</license>
   <buildtool_depend>ament_cmake</buildtool_depend>
+  <build_depend>wheeltec_chassis_cpp</build_depend>
   <build_depend>geometry_msgs</build_depend>
   <build_depend>nav2_behavior_tree</build_depend>
   <build_depend>nav2_behaviors</build_depend>

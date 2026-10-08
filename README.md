@@ -28,6 +28,8 @@
 
 ## 快速开始
 
+当前先按 [IMU 左右转验收](docs/IMU转弯验收-2026-10-08.md) 测试停车误差，通过后再执行下面的导航启动步骤。
+
 ```bash
 # Jetson 编译
 cd ~/Desktop/nav_n10/ros2_ws

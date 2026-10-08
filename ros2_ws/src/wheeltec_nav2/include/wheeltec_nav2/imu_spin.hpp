@@ -8,6 +8,7 @@
 #include "nav2_behaviors/timed_behavior.hpp"
 #include "nav2_msgs/action/spin.hpp"
 #include "sensor_msgs/msg/imu.hpp"
+#include "wheeltec_chassis_cpp/gyro_yaw.hpp"
 
 namespace wheeltec_nav2
 {
@@ -27,23 +28,29 @@ public:
 private:
   void imuCallback(const sensor_msgs::msg::Imu::SharedPtr message);
   bool isCollisionFree(
-    double relative_yaw,
+    double remaining_yaw,
     geometry_msgs::msg::Twist * command,
     geometry_msgs::msg::Pose2D & pose);
 
   rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_subscription_;
   std::mutex imu_mutex_;
-  double imu_unwrapped_yaw_{0.0};
-  double imu_last_raw_yaw_{0.0};
-  rclcpp::Time imu_last_time_{0, 0, RCL_ROS_TIME};
-  bool imu_received_{false};
+  wheeltec_chassis_cpp::GyroYaw gyro_yaw_;
+  uint64_t goal_imu_generation_{0};
+  double imu_yaw_sign_{1.0};
+  double imu_gyro_deadband_{0.03};
+  double imu_max_delta_{0.25};
+  double settle_time_sec_{0.3};
+  double stopped_rate_{0.05};
+  bool settling_{false};
+  std::chrono::steady_clock::time_point settled_since_{};
+  std::chrono::steady_clock::time_point started_{};
 
-  double min_angular_speed_{0.60};
-  double max_angular_speed_{0.80};
+  double min_angular_speed_{0.55};
+  double max_angular_speed_{0.60};
   double proportional_gain_{1.8};
   double slow_down_angle_{0.45};
   double angle_tolerance_{0.045};
-  double imu_timeout_sec_{0.25};
+  double imu_timeout_sec_{0.2};
   double pulse_period_sec_{0.24};
   double pulse_on_sec_{0.08};
   double simulate_ahead_time_{1.5};
@@ -54,7 +61,6 @@ private:
   double target_yaw_{0.0};
   double requested_yaw_{0.0};
   rclcpp::Duration command_time_allowance_{0, 0};
-  rclcpp::Time end_time_{0, 0, RCL_ROS_TIME};
 };
 
 }  // namespace wheeltec_nav2

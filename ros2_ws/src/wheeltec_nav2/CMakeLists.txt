@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.8)
 project(wheeltec_nav2)
 
 find_package(ament_cmake REQUIRED)
+find_package(wheeltec_chassis_cpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav2_behavior_tree REQUIRED)
 find_package(nav2_behaviors REQUIRED)
@@ -39,6 +40,7 @@ ament_target_dependencies(wheeltec_hysteresis_controller
   tf2
 )
 ament_target_dependencies(wheeltec_imu_spin_behavior
+  wheeltec_chassis_cpp
   geometry_msgs
   nav2_behaviors
   nav2_core
