@@ -37,8 +37,8 @@ done
 echo "=== [4/4] 启动三个数据节点 ==="
 source "${WS}/ros2_ws/install/setup.bash"
 
-nohup ros2 run wheeltec_chassis chassis_bridge --ros-args \
-  --params-file "${WS}/ros2_ws/src/wheeltec_chassis/config/chassis.yaml" > /tmp/chassis.log 2>&1 &
+nohup ros2 run wheeltec_chassis_cpp chassis_bridge_cpp --ros-args \
+  --params-file "${WS}/ros2_ws/src/wheeltec_chassis_cpp/config/chassis.yaml" > /tmp/chassis.log 2>&1 &
 nohup ros2 run anorosdt2 anoros_dt --ros-args \
   --params-file "${WS}/ros2_ws/src/anorosdt2/config/anorosdt2.yaml" > /tmp/anoro.log 2>&1 &
 nohup ros2 run lslidar_driver lslidar_driver_node --ros-args \

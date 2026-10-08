@@ -69,9 +69,11 @@ def generate_launch_description():
 
     # ── 底盘桥接 ──
     chassis_node = Node(
-        package='wheeltec_chassis', executable='chassis_bridge',
+        package='wheeltec_chassis_cpp', executable='chassis_bridge_cpp',
         name='chassis_bridge',
-        parameters=[os.path.join(chassis_pkg, 'config', 'chassis.yaml')],
+        parameters=[os.path.join(
+            get_package_share_directory('wheeltec_chassis_cpp'),
+            'config', 'chassis.yaml')],
         output='screen')
 
     # ── 地图服务器 ──
@@ -96,7 +98,6 @@ def generate_launch_description():
         'planner_server',
         'behavior_server',
         'bt_navigator',
-        'velocity_smoother',
     ]
 
     localization_manager = Node(
@@ -124,7 +125,7 @@ def generate_launch_description():
         package='nav2_controller', executable='controller_server',
         name='controller_server', output='screen',
         parameters=[nav2_params],
-        remappings=[('cmd_vel', '/cmd_vel_nav')])
+        remappings=[('cmd_vel', '/cmd_vel')])
 
     planner_server = Node(
         package='nav2_planner', executable='planner_server',
@@ -142,12 +143,6 @@ def generate_launch_description():
         parameters=[nav2_params, {
             'default_nav_to_pose_bt_xml': safe_navigation_tree,
         }])
-
-    velocity_smoother = Node(
-        package='nav2_velocity_smoother', executable='velocity_smoother',
-        name='velocity_smoother', output='screen',
-        parameters=[nav2_params],
-        remappings=[('cmd_vel', '/cmd_vel_nav'), ('cmd_vel_smoothed', '/cmd_vel')])
 
     # ── RViz ──
     rviz_node = Node(
@@ -169,7 +164,6 @@ def generate_launch_description():
         planner_server,
         behavior_server,
         bt_navigator,
-        velocity_smoother,
         localization_manager,
         navigation_manager,
         navigation_autostarter,

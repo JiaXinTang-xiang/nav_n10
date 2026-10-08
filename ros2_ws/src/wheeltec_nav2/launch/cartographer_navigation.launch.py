@@ -24,7 +24,7 @@ def generate_launch_description():
         package='nav2_controller', executable='controller_server',
         name='controller_server', output='screen',
         parameters=[params_file],
-        remappings=[('cmd_vel', '/cmd_vel_nav')])
+        remappings=[('cmd_vel', '/cmd_vel')])
 
     planner_server = Node(
         package='nav2_planner', executable='planner_server',
@@ -39,16 +39,14 @@ def generate_launch_description():
     bt_navigator = Node(
         package='nav2_bt_navigator', executable='bt_navigator',
         name='bt_navigator', output='screen',
+        remappings=[('goal_pose', '/_nav2_direct_goal_disabled')],
         parameters=[params_file, {
             'default_nav_to_pose_bt_xml': behavior_tree,
         }])
 
-    velocity_smoother = Node(
-        package='nav2_velocity_smoother', executable='velocity_smoother',
-        name='velocity_smoother', output='screen',
-        parameters=[params_file],
-        remappings=[('cmd_vel', '/cmd_vel_nav'),
-                    ('cmd_vel_smoothed', '/cmd_vel')])
+    goal_guard = Node(
+        package='wheeltec_nav2', executable='navigation_goal_guard.py',
+        name='navigation_goal_guard', output='screen')
 
     lifecycle_manager = Node(
         package='nav2_lifecycle_manager', executable='lifecycle_manager',
@@ -56,12 +54,12 @@ def generate_launch_description():
         parameters=[{
             'use_sim_time': False,
             'autostart': True,
+            'bond_timeout': 15.0,
             'node_names': [
                 'controller_server',
                 'planner_server',
                 'behavior_server',
                 'bt_navigator',
-                'velocity_smoother',
             ],
         }])
 
@@ -77,7 +75,7 @@ def generate_launch_description():
         planner_server,
         behavior_server,
         bt_navigator,
-        velocity_smoother,
+        goal_guard,
         lifecycle_manager,
         rviz_node,
     ])

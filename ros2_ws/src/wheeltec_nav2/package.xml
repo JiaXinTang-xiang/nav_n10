@@ -11,8 +11,10 @@
   <build_depend>nav2_behavior_tree</build_depend>
   <build_depend>nav2_behaviors</build_depend>
   <build_depend>nav2_core</build_depend>
+  <build_depend>nav2_costmap_2d</build_depend>
   <build_depend>nav2_msgs</build_depend>
   <build_depend>nav2_util</build_depend>
+  <build_depend>nav_msgs</build_depend>
   <build_depend>pluginlib</build_depend>
   <build_depend>rclcpp</build_depend>
   <build_depend>sensor_msgs</build_depend>
@@ -28,13 +30,17 @@
   <exec_depend>tf2_ros</exec_depend>
   <exec_depend>nav2_behaviors</exec_depend>
   <exec_depend>nav2_core</exec_depend>
+  <exec_depend>nav2_costmap_2d</exec_depend>
   <exec_depend>nav2_util</exec_depend>
+  <exec_depend>nav_msgs</exec_depend>
   <exec_depend>pluginlib</exec_depend>
   <exec_depend>rclcpp</exec_depend>
   <exec_depend>tf2</exec_depend>
+  <exec_depend>wheeltec_chassis_cpp</exec_depend>
   <exec_depend>behaviortree_cpp_v3</exec_depend>
   <export>
     <build_type>ament_cmake</build_type>
     <nav2_core plugin="${prefix}/imu_behavior_plugin.xml" />
+    <nav2_core plugin="${prefix}/controller_plugin.xml" />
   </export>
 </package>

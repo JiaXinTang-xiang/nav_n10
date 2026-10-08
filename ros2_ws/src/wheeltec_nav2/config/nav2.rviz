@@ -59,3 +59,9 @@ Visualization Manager:
   Tools:
     - Class: rviz_default_plugins/SetInitialPose
     - Class: rviz_default_plugins/SetGoal
+      Topic:
+        Depth: 1
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /navigation_goal

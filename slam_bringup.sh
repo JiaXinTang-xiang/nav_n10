@@ -73,8 +73,8 @@ ros2 daemon start >/dev/null 2>&1 || true
 
 echo "=== [2/5] 三路数据 ==="
 source "${WS}/ros2_ws/install/setup.bash"
-nohup ros2 run wheeltec_chassis chassis_bridge --ros-args \
-  --params-file "${WS}/ros2_ws/src/wheeltec_chassis/config/chassis.yaml" \
+nohup ros2 run wheeltec_chassis_cpp chassis_bridge_cpp --ros-args \
+  --params-file "${WS}/ros2_ws/src/wheeltec_chassis_cpp/config/chassis.yaml" \
   -p serial_port:="${CHASSIS_DEVICE}" \
   -p publish_tf:=true > /tmp/chassis.log 2>&1 &
 nohup ros2 run anorosdt2 anoros_dt --ros-args \

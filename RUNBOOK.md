@@ -53,7 +53,8 @@ ros2 topic hz /scan
 ### 2.2 底盘（里程计）
 
 ```bash
-ros2 run wheeltec_chassis chassis_bridge --ros-args -p serial_port:=/dev/chassis
+ros2 run wheeltec_chassis_cpp chassis_bridge_cpp --ros-args \
+  --params-file ~/Desktop/nav_n10/ros2_ws/src/wheeltec_chassis_cpp/config/chassis.yaml
 
 # 验证（应 ~50Hz）
 ros2 topic hz /odom
@@ -92,7 +93,8 @@ pkill -9 -f anoros_dt
 pkill -9 -f lslidar_driver_node
 
 # 起三个数据节点
-ros2 run wheeltec_chassis chassis_bridge --ros-args -p serial_port:=/dev/chassis &
+ros2 run wheeltec_chassis_cpp chassis_bridge_cpp --ros-args \
+  --params-file ~/Desktop/nav_n10/ros2_ws/src/wheeltec_chassis_cpp/config/chassis.yaml &
 ros2 run anorosdt2 anoros_dt --ros-args -p serial_port:=/dev/imu &
 ros2 run lslidar_driver lslidar_driver_node --ros-args \
   -p lidar_name:=N10 -p interface_selection:=serial \

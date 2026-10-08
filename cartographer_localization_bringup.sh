@@ -39,7 +39,8 @@ for pattern in \
   start_cartographer_localization \
   lslidar_driver_node anoros_dt chassis_bridge robot_state_publisher \
   map_server amcl controller_server planner_server behavior_server \
-  bt_navigator velocity_smoother navigation_autostarter lifecycle_manager; do
+  bt_navigator velocity_smoother navigation_autostarter navigation_goal_guard \
+  cartographer_navigation.launch.py lifecycle_manager; do
   pkill -TERM -f "${pattern}" 2>/dev/null || true
 done
 sleep 2
@@ -48,15 +49,16 @@ for pattern in \
   start_cartographer_localization \
   lslidar_driver_node anoros_dt chassis_bridge robot_state_publisher \
   map_server amcl controller_server planner_server behavior_server \
-  bt_navigator velocity_smoother navigation_autostarter lifecycle_manager; do
+  bt_navigator velocity_smoother navigation_autostarter navigation_goal_guard \
+  cartographer_navigation.launch.py lifecycle_manager; do
   pkill -KILL -f "${pattern}" 2>/dev/null || true
 done
 
 CONFIG_DIR="${WS}/ros2_ws/install/lslidar_driver/share/lslidar_driver/config"
 
 echo "=== 启动传感器和底盘里程计 ==="
-nohup ros2 run wheeltec_chassis chassis_bridge --ros-args \
-  --params-file "${WS}/ros2_ws/src/wheeltec_chassis/config/chassis.yaml" \
+nohup ros2 run wheeltec_chassis_cpp chassis_bridge_cpp --ros-args \
+  --params-file "${WS}/ros2_ws/src/wheeltec_chassis_cpp/config/chassis.yaml" \
   -p serial_port:=/dev/chassis -p publish_tf:=true \
   > /tmp/chassis.log 2>&1 &
 nohup ros2 run anorosdt2 anoros_dt --ros-args \

@@ -9,7 +9,8 @@
 │   ├── anorosdt2/         # 飞控 IMU 桥接（Python）
 │   ├── lslidar_driver/    # LSN10 激光雷达驱动（C++）
 │   ├── lslidar_msgs/      # 镭神自定义消息
-│   ├── wheeltec_chassis/  # 底盘串口桥接（Python）
+│   ├── wheeltec_chassis/  # 底盘串口桥接（Python 回退）
+│   ├── wheeltec_chassis_cpp/ # 底盘串口桥接（生产 C++）
 │   └── wheeltec_nav2/     # Nav2 导航配置和 IMU 转弯插件
 ├── firmware_fc/           # ANO 飞控固件（STM32F407）
 ├── firmware_chassis/      # 底盘固件
@@ -21,7 +22,7 @@
 - Jetson 运行雷达、飞控 IMU、底盘桥接、Cartographer 和 Nav2。
 - PC 运行 RViz，通过 CycloneDDS 观察 Jetson 数据。
 - `map -> odom` 由 Cartographer 发布。
-- `odom -> base_link` 由 `chassis_bridge` 发布。
+- `odom -> base_link` 由唯一的 `chassis_bridge_cpp` 发布；原 `wheeltec_chassis/chassis_bridge` 保留作回退。
 - `base_link -> laser/imu_link` 由 `robot_state_publisher` 发布。
 - 纯定位模式禁止同时运行 AMCL。
 

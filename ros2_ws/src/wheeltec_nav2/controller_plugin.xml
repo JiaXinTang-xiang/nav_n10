@@ -1,0 +1,5 @@
+<library path="wheeltec_hysteresis_controller">
+  <class name="wheeltec_nav2/HysteresisPathController" type="wheeltec_nav2::HysteresisPathController" base_class_type="nav2_core::Controller">
+    <description>Path controller with turn-drive hysteresis for a differential chassis with a minimum effective angular speed.</description>
+  </class>
+</library>

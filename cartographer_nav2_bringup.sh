@@ -32,11 +32,16 @@ if [ "${cartographer_count}" -ne 1 ]; then
   exit 1
 fi
 
-for pattern in controller_server planner_server behavior_server bt_navigator \
-  velocity_smoother lifecycle_manager_navigation; do
-  pkill -TERM -f "${pattern}" 2>/dev/null || true
-done
-sleep 1
+stop_old_nav2() {
+  local signal="$1"
+  ps -eo pid=,args= | awk -v self="$$" -v parent="${PPID}" \
+    '/cartographer_navigation.launch.py|navigation_goal_guard.py|controller_server|planner_server|behavior_server|bt_navigator|velocity_smoother|lifecycle_manager_navigation/ && $1 != self && $1 != parent {print $1}' | \
+    xargs -r kill "-${signal}" 2>/dev/null || true
+}
+
+stop_old_nav2 TERM
+sleep 2
+stop_old_nav2 KILL
 
 echo "=== 检查定位 TF 时间戳 ==="
 ros2 run wheeltec_nav2 wait_for_localization.py \
